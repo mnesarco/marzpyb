@@ -1,0 +1,29 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "cmake.buildDirectory": "${workspaceFolder}/build",
+        "cmake.generator": "Ninja",
+        "cmake.configureSettings": {
+            "CMAKE_CXX_STANDARD": "17",
+            "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+            "CMAKE_CXX_EXTENSIONS": "OFF"
+        },
+        "C_Cpp.default.cppStandard": "c++17",
+        "C_Cpp.default.cStandard": "c17",
+        "C_Cpp.default.includePath": [
+            "${workspaceFolder}/**",
+            "${workspaceFolder}/.pixi/envs/default/include/python3.13"
+        ]
+    },
+    "extensions": {
+        "recommendations": [
+            "llvm-vs-code-extensions.vscode-clangd",
+            "ms-vscode.cmake-tools",
+            "ms-python.python"
+        ]
+    }
+}

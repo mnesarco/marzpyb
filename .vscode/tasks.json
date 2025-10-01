@@ -1,0 +1,94 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "cmake",
+            "label": "cmake: build",
+            "command": "build",
+            "targets": [
+                "marzpyb"
+            ],
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "Build with CMake"
+        },
+        {
+            "type": "shell",
+            "label": "Build Debug",
+            "command": "pixi",
+            "args": [
+                "run",
+                "cmake",
+                "--build",
+                "${workspaceFolder}/build",
+                "--config",
+                "Debug"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$gcc",
+            "dependsOrder": "sequence",
+            "dependsOn": "Update Compile Commands"
+        },
+        {
+            "type": "shell",
+            "label": "Update Compile Commands",
+            "command": "cp",
+            "args": [
+                "${workspaceFolder}/build/compile_commands.json",
+                "${workspaceFolder}/compile_commands.json"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": false,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
+            "label": "Clean and Reconfigure",
+            "command": "rm",
+            "args": [
+                "-rf",
+                "${workspaceFolder}/build"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "dependsOrder": "sequence",
+            "dependsOn": "cmake: configure"
+        },
+        {
+            "type": "shell",
+            "label": "Format Code",
+            "command": "clang-format",
+            "args": [
+                "-i",
+                "${file}"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        }
+    ]
+}

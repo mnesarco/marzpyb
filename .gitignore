@@ -1,0 +1,5 @@
+# pixi environments
+.pixi
+build/
+.cache
+compile_commands.json
