@@ -46,7 +46,7 @@ struct type_list
 
 // Concatenate two lists of types (Deduction guide)
 template <typename... Ts, typename... Us>
-constexpr auto concat_types(type_list<Ts...>, type_list<Us...>) -> type_list<Ts..., Us...>;
+inline constexpr auto concat_types(type_list<Ts...>, type_list<Us...>) -> type_list<Ts..., Us...>;
 
 // flatmap of list of parse types: The recursive case
 // Concatenate all parse types from arguments into a single list of types
@@ -161,13 +161,13 @@ struct has_parse_ptr_value<T, std::void_t<decltype(T::parse_ptr_value())>> : std
 {};
 
 template <typename T>
-constexpr bool has_name_member_v = has_name_member<T>::value;
+inline constexpr bool has_name_member_v = has_name_member<T>::value;
 
 template <typename T>
-constexpr bool has_clean_method_v = has_clean_method<T>::value;
+inline constexpr bool has_clean_method_v = has_clean_method<T>::value;
 
 template <typename T>
-constexpr bool has_default_value_v = has_default_value<T>::value;
+inline constexpr bool has_default_value_v = has_default_value<T>::value;
 
 // Helper trait to check if Fn is callable with the types in Tuple
 template <typename Fn, typename Tuple>
@@ -179,7 +179,7 @@ struct is_callable_with_tuple<Fn, std::tuple<Ts...>> : std::is_invocable<Fn, Ts.
 
 // Convenience alias
 template <typename Fn, typename Tuple>
-constexpr bool is_callable_with_tuple_v = is_callable_with_tuple<Fn, Tuple>::value;
+inline constexpr bool is_callable_with_tuple_v = is_callable_with_tuple<Fn, Tuple>::value;
 
 template <typename T>
 struct arg_traits
@@ -191,7 +191,7 @@ struct arg_traits
 
 // Call init on all parser values
 template <std::size_t Index = 0, std::size_t Pos = 0, typename... Args, typename Parsed>
-void apply_init_helper(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
+inline void apply_init_helper(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
 {
     if constexpr (Index < sizeof...(Args))
     {
@@ -211,14 +211,14 @@ void apply_init_helper(Parsed& parsed, const std::tuple<Args...>* args = nullptr
 }
 
 template <typename... Args, typename Parsed>
-void apply_inits(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
+inline void apply_inits(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
 {
     apply_init_helper(parsed, args);
 }
 
 // Call clean on all parser values if available
 template <std::size_t Index = 0, std::size_t Pos = 0, typename... Args, typename Parsed>
-void apply_clean_helper(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
+inline void apply_clean_helper(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
 {
     if constexpr (Index < sizeof...(Args))
     {
@@ -234,7 +234,7 @@ void apply_clean_helper(Parsed& parsed, const std::tuple<Args...>* args = nullpt
 }
 
 template <typename... Args, typename Parsed>
-void apply_clean(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
+inline void apply_clean(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
 {
     apply_clean_helper(parsed, args);
 }
@@ -245,7 +245,9 @@ template <std::size_t Index = 0,
           typename... Args,
           typename Values,
           typename Parsed>
-void apply_get_helper(Parsed& parsed, Values& values, const std::tuple<Args...>* args = nullptr)
+inline void apply_get_helper(Parsed& parsed,
+                             Values& values,
+                             const std::tuple<Args...>* args = nullptr)
 {
     if constexpr (Index < sizeof...(Args))
     {
@@ -256,7 +258,7 @@ void apply_get_helper(Parsed& parsed, Values& values, const std::tuple<Args...>*
 }
 
 template <typename... Args, typename Values, typename Parsed>
-void apply_gets(Parsed& parsed, Values& values, const std::tuple<Args...>* args = nullptr)
+inline void apply_gets(Parsed& parsed, Values& values, const std::tuple<Args...>* args = nullptr)
 {
     apply_get_helper(parsed, values, args);
 }
@@ -268,15 +270,15 @@ void apply_gets(Parsed& parsed, Values& values, const std::tuple<Args...>* args 
 // format string builder from a list of argument types
 // Build the final format string from all arguments.
 template <typename... Ts>
-constexpr auto args_fmt = (Ts::fmt + ...);
+inline constexpr auto args_fmt = (Ts::fmt + ...);
 
 // Count named arguments
 template <typename... Ts>
-constexpr auto count_keywords = (0 + ... + (std::decay_t<Ts>::named ? 1 : 0));
+inline constexpr auto count_keywords = (0 + ... + (std::decay_t<Ts>::named ? 1 : 0));
 
 // Build the keywords array from named arguments
 template <typename... Ts>
-constexpr auto build_keywords(Ts&&... args)
+inline constexpr auto build_keywords(Ts&&... args)
 {
     constexpr size_t size = count_keywords<Ts...> + 1; // +1 for nullptr
     std::array<const char*, size> result {};
@@ -298,7 +300,7 @@ constexpr auto build_keywords(Ts&&... args)
 // Builder for the named arguments (strip markers)
 // Recursive helper to build tuple of named args
 template <std::size_t I = 0, typename... Ts>
-constexpr auto build_named_args_impl(const std::tuple<Ts...>& args)
+inline constexpr auto build_named_args_impl(const std::tuple<Ts...>& args)
 {
     if constexpr (I == sizeof...(Ts))
     {
@@ -323,7 +325,7 @@ constexpr auto build_named_args_impl(const std::tuple<Ts...>& args)
 
 // Build a tuple of named arguments (similar to build_keywords but returns tuple of args)
 template <typename... Ts>
-constexpr auto build_named_args(Ts&&... args)
+inline constexpr auto build_named_args(Ts&&... args)
 {
     auto args_tuple = std::make_tuple(std::forward<Ts>(args)...);
     return build_named_args_impl(args_tuple);
@@ -338,7 +340,7 @@ struct marker_arg
 };
 
 template <typename T>
-constexpr auto parse_ptr(T&& obj)
+inline constexpr auto parse_ptr(T&& obj)
 {
     using Type = std::decay_t<T>;
 
@@ -357,23 +359,23 @@ constexpr auto parse_ptr(T&& obj)
 // └──────────────────────────────────────────────────────────────────────────┘
 
 template <typename Tuple, std::size_t... I>
-auto PyArg_ParseTupleAndKeywords_Impl(PyObject* args,
-                                      PyObject* kwArgs,
-                                      const char* fmt,
-                                      char** keywords,
-                                      Tuple&& tup,
-                                      std::index_sequence<I...> _seq) -> int
+inline auto PyArg_ParseTupleAndKeywords_Impl(PyObject* args,
+                                             PyObject* kwArgs,
+                                             const char* fmt,
+                                             char** keywords,
+                                             Tuple&& tup,
+                                             std::index_sequence<I...> _seq) -> int
 {
     return PyArg_ParseTupleAndKeywords(
         args, kwArgs, fmt, keywords, parse_ptr(std::get<I>(std::forward<Tuple>(tup)))...);
 }
 
 template <typename... Args, std::size_t N>
-auto PyArg_ParseTupleAndKeywords_Tuple(PyObject* args,
-                                       PyObject* kwArgs,
-                                       const char* fmt,
-                                       const std::array<const char*, N> keywords,
-                                       const std::tuple<Args...>& tup) -> int
+inline auto PyArg_ParseTupleAndKeywords_Tuple(PyObject* args,
+                                              PyObject* kwArgs,
+                                              const char* fmt,
+                                              const std::array<const char*, N> keywords,
+                                              const std::tuple<Args...>& tup) -> int
 {
     return PyArg_ParseTupleAndKeywords_Impl(args,
                                             kwArgs,
@@ -419,7 +421,7 @@ FmtString(const char (&)[N]) -> FmtString<N>;
 
 // Concatenation over FmtString
 template <std::size_t N1, std::size_t N2>
-constexpr auto operator+(const FmtString<N1>& lhs, const FmtString<N2>& rhs)
+inline constexpr auto operator+(const FmtString<N1>& lhs, const FmtString<N2>& rhs)
 {
     FmtString<N1 + N2 - 1> result {}; // -1 avoids double '\0'
     for (std::size_t i = 0; i < N1 - 1; ++i)
@@ -954,10 +956,10 @@ template <typename... Ts>
 Arguments(Ts&&...) -> Arguments<Ts...>;
 
 template <typename... ArgsAndCallbacks, std::size_t... I>
-auto dispatch_overloads_impl(PyObject* args,
-                             PyObject* kwArgs,
-                             std::tuple<ArgsAndCallbacks...>&& args_tuple,
-                             std::index_sequence<I...> _seq)
+inline auto dispatch_overloads_impl(PyObject* args,
+                                    PyObject* kwArgs,
+                                    std::tuple<ArgsAndCallbacks...>&& args_tuple,
+                                    std::index_sequence<I...> _seq)
 {
     return (false || ... || [&] {
         constexpr std::size_t args_idx = I * 2;
@@ -971,7 +973,9 @@ auto dispatch_overloads_impl(PyObject* args,
 }
 
 template <typename... ArgsAndCallbacks>
-auto dispatch_overloads(PyObject* args, PyObject* kwArgs, ArgsAndCallbacks&&... args_and_callbacks)
+inline auto dispatch_overloads(PyObject* args,
+                               PyObject* kwArgs,
+                               ArgsAndCallbacks&&... args_and_callbacks)
 {
     static_assert(sizeof...(args_and_callbacks) % 2 == 0,
                   "Arguments must come in pairs: Arguments object and callback");
