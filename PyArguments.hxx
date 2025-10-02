@@ -32,7 +32,7 @@ namespace Base::Py
 // ║ Private implementation details                                           ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
 
-inline namespace details // Private details
+namespace detail // Private implementation details
 {
 
 // ┌──────────────────────────────────────────────────────────────────────────┐
@@ -383,7 +383,7 @@ auto PyArg_ParseTupleAndKeywords_Tuple(PyObject* args,
                                             std::index_sequence_for<Args...> {});
 }
 
-} // namespace details
+} // namespace detail
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║ Public API                                                               ║
@@ -453,8 +453,8 @@ struct value_arg
 {
     static constexpr std::size_t offset = 1;
 
-    using value_type = type_list<T>;
-    using parse_type = type_list<T>;
+    using value_type = detail::type_list<T>;
+    using parse_type = detail::type_list<T>;
 
     template <std::size_t Offset, typename... Args>
     static constexpr void init(std::tuple<Args...>& tuple)
@@ -541,8 +541,8 @@ struct FSPath
 template <typename T>
 struct Arg : named_arg
 {
-    using value_type = type_list<T*>;
-    using parse_type = type_list<PyTypeObject&, PyObject*>;
+    using value_type = detail::type_list<T*>;
+    using parse_type = detail::type_list<PyTypeObject&, PyObject*>;
 
     static constexpr PyTypeObject& py_type = T::Type;
     static constexpr FmtString fmt {"O!"};
@@ -566,8 +566,8 @@ struct Arg : named_arg
 template <>
 struct Arg<Tuple> : named_arg
 {
-    using value_type = type_list<PyTupleObject*>;
-    using parse_type = type_list<PyTypeObject&, PyTupleObject*>;
+    using value_type = detail::type_list<PyTupleObject*>;
+    using parse_type = detail::type_list<PyTypeObject&, PyTupleObject*>;
 
     static constexpr FmtString fmt {"O!"};
     static constexpr std::size_t offset = 2;
@@ -590,8 +590,8 @@ struct Arg<Tuple> : named_arg
 template <>
 struct Arg<Dict> : named_arg
 {
-    using value_type = type_list<PyDictObject*>;
-    using parse_type = type_list<PyTypeObject&, PyDictObject*>;
+    using value_type = detail::type_list<PyDictObject*>;
+    using parse_type = detail::type_list<PyTypeObject&, PyDictObject*>;
 
     static constexpr FmtString fmt {"O!"};
     static constexpr std::size_t offset = 2;
@@ -612,21 +612,21 @@ struct Arg<Dict> : named_arg
 
 // Position-only marker
 template <>
-struct Arg<PosOnly> : marker_arg
+struct Arg<PosOnly> : detail::marker_arg
 {
     static constexpr FmtString fmt {""};
 };
 
 // Keyword-only marker
 template <>
-struct Arg<KwOnly> : marker_arg
+struct Arg<KwOnly> : detail::marker_arg
 {
     static constexpr FmtString fmt {"$"};
 };
 
 // Optional marker
 template <>
-struct Arg<Optional> : marker_arg
+struct Arg<Optional> : detail::marker_arg
 {
     static constexpr FmtString fmt {"|"};
 };
@@ -753,8 +753,8 @@ struct Arg<std::string_view> : named_arg
     static constexpr FmtString fmt {"s#"};
     static constexpr std::size_t offset = 2;
 
-    using value_type = type_list<std::string_view>;
-    using parse_type = type_list<c_str_t, Py_ssize_t>;
+    using value_type = detail::type_list<std::string_view>;
+    using parse_type = detail::type_list<c_str_t, Py_ssize_t>;
 
     template <std::size_t Offset, typename... Args>
     static constexpr void init(std::tuple<Args...>& tuple)
@@ -779,8 +779,8 @@ struct Arg<std::string> : named_arg
     static constexpr FmtString fmt {"s#"};
     static constexpr std::size_t offset = 2;
 
-    using value_type = type_list<std::string>;
-    using parse_type = type_list<c_str_t, Py_ssize_t>;
+    using value_type = detail::type_list<std::string>;
+    using parse_type = detail::type_list<c_str_t, Py_ssize_t>;
 
     template <std::size_t Offset, typename... Args>
     static constexpr void init(std::tuple<Args...>& tuple)
@@ -812,8 +812,8 @@ struct Arg<FSPath> : named_arg
     static constexpr FmtString fmt {"O&"};
     static constexpr std::size_t offset = 2;
 
-    using value_type = type_list<std::string_view>;
-    using parse_type = type_list<FSPath, PyObject*>;
+    using value_type = detail::type_list<std::string_view>;
+    using parse_type = detail::type_list<FSPath, PyObject*>;
 
     template <std::size_t Offset, typename... Args>
     static constexpr void init(std::tuple<Args...>& tuple)
@@ -844,14 +844,14 @@ struct Arg<FSPath> : named_arg
 template <typename Encoding>
 struct ArgEncCStr : named_arg
 {
-    static_assert(has_parse_ptr_value<Encoding>::value,
+    static_assert(detail::has_parse_ptr_value<Encoding>::value,
                   "Encoding must have a static constexpr const char* parse_ptr_value() member");
 
     static constexpr FmtString fmt {"et"};
     static constexpr std::size_t offset = 2;
 
-    using value_type = type_list<c_str_t>;
-    using parse_type = type_list<Encoding, char*>;
+    using value_type = detail::type_list<c_str_t>;
+    using parse_type = detail::type_list<Encoding, char*>;
 
     template <std::size_t Offset, typename... Args>
     static constexpr void init(std::tuple<Args...>& tuple)
@@ -885,25 +885,25 @@ template <typename... Args>
 struct Arguments
 {
     // Types of the value tuple
-    using value_types = typename expand_value_types<Args...>::value_type;
+    using value_types = typename detail::expand_value_types<Args...>::value_type;
 
     // Type of the tuple to hold the values
-    using value_tuple_t = typename type_list_to_tuple<value_types>::type;
+    using value_tuple_t = typename detail::type_list_to_tuple<value_types>::type;
 
     // Types to pass to Wrapped_ParseTupleAndKeywords va_list
-    using parse_types = typename expand_parse_types<Args...>::parse_type;
+    using parse_types = typename detail::expand_parse_types<Args...>::parse_type;
 
     // Type of the tuple to hold the values
-    using parse_tuple_t = typename type_list_to_tuple<parse_types>::type;
+    using parse_tuple_t = typename detail::type_list_to_tuple<parse_types>::type;
 
     // Tuple of Arguments
     using args_tuple_t =
-        typename type_list_to_tuple<typename expand_arg_types<Args...>::type>::type;
+        typename detail::type_list_to_tuple<typename detail::expand_arg_types<Args...>::type>::type;
 
     template <typename... Ts>
     explicit constexpr Arguments(Ts&&... args) noexcept
-        : keywords {build_keywords(args...)}
-        , args {build_named_args(args...)}
+        : keywords {detail::build_keywords(args...)}
+        , args {detail::build_named_args(args...)}
     {
         // ...
     }
@@ -911,6 +911,7 @@ struct Arguments
     template <bool Check = true, typename Callback>
     auto match(PyObject* args, PyObject* kwArgs, Callback&& callback) const -> bool
     {
+        using namespace detail;
 
         static_assert(is_callable_with_tuple_v<Callback, value_tuple_t>,
                       "Lambda must be callable with the expected argument "
@@ -942,10 +943,10 @@ struct Arguments
         return result != 0;
     }
 
-    static constexpr FmtString fmt = args_fmt<Args...>;
+    static constexpr FmtString fmt = detail::args_fmt<Args...>;
 
 private:
-    std::array<const char*, count_keywords<Args...> + 1> keywords {};
+    std::array<const char*, detail::count_keywords<Args...> + 1> keywords {};
     args_tuple_t args {};
 };
 

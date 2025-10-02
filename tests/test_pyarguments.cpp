@@ -10,6 +10,7 @@
 #include <tuple>
 
 using namespace Base::Py;
+using namespace Base::Py::detail;
 
 class PyArgumentsTest : public ::testing::Test
 {
