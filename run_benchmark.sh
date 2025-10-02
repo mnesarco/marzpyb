@@ -8,5 +8,5 @@ fi
 
 mkdir "$BUILD"
 cd "$BUILD"
-cmake -G Ninja ..
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release ..
 time ninja compile_benchmark

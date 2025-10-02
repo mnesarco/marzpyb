@@ -161,6 +161,9 @@ struct has_parse_ptr_value<T, std::void_t<decltype(T::parse_ptr_value())>> : std
 {};
 
 template <typename T>
+inline constexpr bool has_parse_ptr_value_v = has_parse_ptr_value<T>::value;
+
+template <typename T>
 inline constexpr bool has_name_member_v = has_name_member<T>::value;
 
 template <typename T>
@@ -339,7 +342,7 @@ inline constexpr auto parse_ptr(T&& obj)
 {
     using Type = std::decay_t<T>;
 
-    if constexpr (has_parse_ptr_value<Type>::value)
+    if constexpr (has_parse_ptr_value_v<Type>)
     {
         return Type::parse_ptr_value();
     }
@@ -416,7 +419,7 @@ template <std::size_t N>
 FmtString(const char (&)[N]) -> FmtString<N>;
 
 template <typename... Fmts>
-constexpr std::size_t fmt_size = (0 + ... + (Fmts::size - 1)) + 1;
+inline constexpr std::size_t fmt_size = (0 + ... + (Fmts::size - 1)) + 1;
 
 // Variadic constexpr function to concatenate FmtStrings in one pass
 template <typename... Fmts>
@@ -848,7 +851,7 @@ struct Arg<FSPath> : named_arg
 template <typename Encoding>
 struct ArgEncCStr : named_arg
 {
-    static_assert(detail::has_parse_ptr_value<Encoding>::value,
+    static_assert(detail::has_parse_ptr_value_v<Encoding>,
                   "Encoding must have a static constexpr const char* parse_ptr_value() member");
 
     static constexpr FmtString fmt {"et"};
@@ -949,8 +952,6 @@ struct Arguments
     }
 
     FmtString<fmt_size<decltype(Args::fmt)...>> fmt {};
-
-private:
     std::array<const char*, detail::count_keywords<Args...> + 1> keywords {};
     args_tuple_t args {};
 };
