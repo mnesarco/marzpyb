@@ -1,6 +1,9 @@
 CompileFlags:
   Add:
     - -std=c++17
+    - -ferror-limit=0
+    - -ftemplate-backtrace-limit=0
+    - -ftemplate-depth=1024
   Compiler: clang++
 
 Index:

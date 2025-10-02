@@ -32,7 +32,7 @@ namespace Base::Py
 // ║ Private implementation details                                           ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
 
-namespace // Private details
+inline namespace details // Private details
 {
 
 // ┌──────────────────────────────────────────────────────────────────────────┐
@@ -383,7 +383,7 @@ auto PyArg_ParseTupleAndKeywords_Tuple(PyObject* args,
                                             std::index_sequence_for<Args...> {});
 }
 
-} // namespace
+} // namespace details
 
 // ╔══════════════════════════════════════════════════════════════════════════╗
 // ║ Public API                                                               ║
