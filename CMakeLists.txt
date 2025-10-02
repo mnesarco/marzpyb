@@ -34,6 +34,23 @@ add_executable(marzpyb main.cpp)
 target_include_directories(marzpyb PRIVATE ${Python_INCLUDE_DIRS})
 target_link_libraries(marzpyb PRIVATE ${Python_LIBRARIES})
 
+# Compile time benchmark executable (no gtest overhead)
+# Multiple source files to stress test compilation time
+add_executable(compile_benchmark
+    benchmark/compile_benchmark.cpp
+    benchmark/compile_benchmark2.cpp
+    benchmark/compile_benchmark3.cpp
+    benchmark/compile_benchmark4.cpp
+    benchmark/compile_benchmark5.cpp
+    benchmark/compile_benchmark6.cpp
+    benchmark/compile_benchmark7.cpp
+    benchmark/compile_benchmark8.cpp
+    benchmark/compile_benchmark9.cpp
+    benchmark/compile_benchmark10.cpp
+)
+target_include_directories(compile_benchmark PRIVATE ${Python_INCLUDE_DIRS})
+target_link_libraries(compile_benchmark PRIVATE ${Python_LIBRARIES})
+
 # Create test executable
 add_executable(test_pyarguments tests/test_pyarguments.cpp)
 target_include_directories(test_pyarguments PRIVATE ${Python_INCLUDE_DIRS})
