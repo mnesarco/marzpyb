@@ -57,7 +57,7 @@ TEST_F(PyArgumentsTest, FmtStringConcatenation)
 {
     constexpr auto str1 = FmtString {"hello"};
     constexpr auto str2 = FmtString {" world"};
-    constexpr auto result = str1 + str2;
+    constexpr auto result = fmt_concat(str1, str2);
 
     EXPECT_STREQ(result.value, "hello world");
 }
@@ -681,7 +681,7 @@ TEST_F(PyArgumentsTest, CountKeywords)
 // Test FmtString compilation
 TEST_F(PyArgumentsTest, FmtStringConstexpr)
 {
-    constexpr auto result = FmtString {"a"} + FmtString {"b"} + FmtString {"c"};
+    constexpr auto result = fmt_concat(FmtString {"a"}, FmtString {"b"}, FmtString {"c"});
     EXPECT_STREQ(result.value, "abc");
 }
 

@@ -267,11 +267,6 @@ inline void apply_gets(Parsed& parsed, Values& values, const std::tuple<Args...>
 // │ Argument utils                                                           │
 // └──────────────────────────────────────────────────────────────────────────┘
 
-// format string builder from a list of argument types
-// Build the final format string from all arguments.
-template <typename... Ts>
-inline constexpr auto args_fmt = (Ts::fmt + ...);
-
 // Count named arguments
 template <typename... Ts>
 inline constexpr auto count_keywords = (0 + ... + (std::decay_t<Ts>::named ? 1 : 0));
@@ -413,25 +408,32 @@ struct FmtString
     constexpr FmtString() = default;
 
     char value[N] {};
+    static constexpr std::size_t size = N;
 };
 
 // Deduction guide to help the compiler
 template <std::size_t N>
 FmtString(const char (&)[N]) -> FmtString<N>;
 
-// Concatenation over FmtString
-template <std::size_t N1, std::size_t N2>
-inline constexpr auto operator+(const FmtString<N1>& lhs, const FmtString<N2>& rhs)
+template <typename... Fmts>
+constexpr std::size_t fmt_size = (0 + ... + (Fmts::size - 1)) + 1;
+
+// Variadic constexpr function to concatenate FmtStrings in one pass
+template <typename... Fmts>
+inline constexpr auto fmt_concat(Fmts... fmts)
 {
-    FmtString<N1 + N2 - 1> result {}; // -1 avoids double '\0'
-    for (std::size_t i = 0; i < N1 - 1; ++i)
-    {
-        result.value[i] = lhs.value[i];
-    }
-    for (std::size_t i = 0; i < N2; ++i)
-    {
-        result.value[i + N1 - 1] = rhs.value[i];
-    }
+    Base::Py::FmtString<fmt_size<Fmts...>> result {};
+    char* current_pos = result.value;
+
+    // Use a lambda and C++17 fold expression to copy each string
+    auto copy_fmt = [&](const auto& fmt_str) {
+        for (std::size_t i = 0; i < fmt_str.size - 1; ++i)
+        { // Copy characters, excluding null terminator
+            *current_pos++ = fmt_str.value[i];
+        }
+    };
+    (copy_fmt(fmts), ...); // Apply copy_fmt to each FmtString in the pack
+    *current_pos = '\0';   // Null-terminate the final string
     return result;
 }
 
@@ -906,6 +908,7 @@ struct Arguments
     explicit constexpr Arguments(Ts&&... args) noexcept
         : keywords {detail::build_keywords(args...)}
         , args {detail::build_named_args(args...)}
+        , fmt {fmt_concat(args.fmt...)}
     {
         // ...
     }
@@ -945,7 +948,7 @@ struct Arguments
         return result != 0;
     }
 
-    static constexpr FmtString fmt = detail::args_fmt<Args...>;
+    FmtString<fmt_size<decltype(Args::fmt)...>> fmt {};
 
 private:
     std::array<const char*, detail::count_keywords<Args...> + 1> keywords {};
