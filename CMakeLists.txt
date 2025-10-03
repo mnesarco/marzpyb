@@ -28,12 +28,18 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
+# PyCXX header-only library
+add_library(PyCXX INTERFACE)
+target_include_directories(PyCXX INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/PyCXX
+)
+
 # Enable testing
 enable_testing()
 
 add_executable(marzpyb main.cpp)
 target_include_directories(marzpyb PRIVATE ${Python_INCLUDE_DIRS})
-target_link_libraries(marzpyb PRIVATE ${Python_LIBRARIES})
+target_link_libraries(marzpyb PRIVATE ${Python_LIBRARIES} PyCXX)
 
 # Compile time benchmark executable (no gtest overhead)
 # Multiple source files to stress test compilation time
@@ -50,7 +56,7 @@ add_executable(compile_benchmark
     benchmark/compile_benchmark10.cpp
 )
 target_include_directories(compile_benchmark PRIVATE ${Python_INCLUDE_DIRS})
-target_link_libraries(compile_benchmark PRIVATE ${Python_LIBRARIES})
+target_link_libraries(compile_benchmark PRIVATE ${Python_LIBRARIES} PyCXX)
 
 # Create test executable
 add_executable(test_pyarguments tests/test_pyarguments.cpp)
@@ -59,6 +65,7 @@ target_link_libraries(test_pyarguments PRIVATE
     ${Python_LIBRARIES}
     gtest_main
     gtest
+    PyCXX
 )
 
 # Add test to CTest

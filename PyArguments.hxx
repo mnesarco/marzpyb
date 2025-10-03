@@ -5,6 +5,8 @@
 #ifndef BASE_PYARGUMENTS_H
 #define BASE_PYARGUMENTS_H
 
+#include "CXX/Python3/Objects.hxx"
+#include "pytypedefs.h"
 #include <array>
 #include <memory>
 #include <string>
@@ -20,6 +22,7 @@
 #define PY_CXX_CONST const
 #endif
 
+#include "CXX/Objects.hxx"
 #include <Python.h>
 
 // ┌──────────────────────────────────────────────────────────────────────────┐
@@ -1073,6 +1076,91 @@ using arg_fspath = Arg<FSPath>;
 
 template <typename Encoding>
 using arg_enc_cstr = ArgEncCStr<Encoding>;
+
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║ PyCXX Types                                                              ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+
+namespace cxx = ::Py; // PyCXX
+
+template <typename T>
+struct PyCxxArg : named_arg
+{
+    using value_type = detail::type_list<T>;
+    using parse_type = detail::type_list<PyObject*>;
+
+    static constexpr FmtString fmt {"O"};
+    static constexpr std::size_t offset = 1;
+
+    template <std::size_t Offset, typename... Args>
+    static constexpr void init(std::tuple<Args...>& tuple)
+    {
+        std::get<Offset>(tuple) = nullptr;
+    }
+
+    template <std::size_t Offset, typename... Args>
+    static auto get(std::tuple<Args...>& tuple) -> T
+    {
+        auto* ptr = static_cast<PyObject*>(std::get<Offset>(tuple));
+        return T {ptr};
+    }
+};
+
+template <>
+struct Arg<cxx::Object> : PyCxxArg<cxx::Object>
+{};
+
+template <>
+struct Arg<cxx::Tuple> : PyCxxArg<cxx::Tuple>
+{};
+
+template <>
+struct Arg<cxx::Dict> : PyCxxArg<cxx::Dict>
+{};
+
+template <>
+struct Arg<cxx::List> : PyCxxArg<cxx::List>
+{};
+
+template <>
+struct Arg<cxx::Callable> : PyCxxArg<cxx::Callable>
+{};
+
+template <>
+struct Arg<cxx::Bytes> : PyCxxArg<cxx::Bytes>
+{};
+
+template <>
+struct Arg<cxx::Byte> : PyCxxArg<cxx::Byte>
+{};
+
+template <>
+struct Arg<cxx::String> : PyCxxArg<cxx::String>
+{};
+
+template <>
+struct Arg<cxx::Char> : PyCxxArg<cxx::Char>
+{};
+
+template <>
+struct Arg<cxx::Long> : PyCxxArg<cxx::Long>
+{};
+
+template <>
+struct Arg<cxx::Float> : PyCxxArg<cxx::Float>
+{};
+
+using arg_Float = Arg<cxx::Float>;
+using arg_Long = Arg<cxx::Long>;
+using arg_Char = Arg<cxx::Char>;
+using arg_String = Arg<cxx::String>;
+using arg_Byte = Arg<cxx::Byte>;
+using arg_Bytes = Arg<cxx::Bytes>;
+using arg_List = Arg<cxx::List>;
+using arg_Tuple = Arg<cxx::Tuple>;
+using arg_Dict = Arg<cxx::Dict>;
+using arg_Callable = Arg<cxx::Callable>;
+using arg_Object = Arg<cxx::Object>;
 
 } // namespace Base::Py
 
