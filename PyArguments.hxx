@@ -190,7 +190,8 @@ inline constexpr bool is_same_type_v = std::is_same_v<remove_cvref_t<T1>, remove
 
 // Helper trait to check if Fn is callable with the types in Tuple (no implicit conversions)
 template <typename Fn, typename Tuple>
-struct is_callable_with_tuple;
+struct is_callable_with_tuple : std::false_type
+{};
 
 template <typename Fn, typename... Ts>
 struct is_callable_with_tuple<Fn, std::tuple<Ts...>>
@@ -199,48 +200,42 @@ private:
     // Remove reference from Fn type
     using FnType = std::remove_reference_t<Fn>;
 
-    // Extract parameter types from lambda/functor operator()
-    template <typename F>
-    struct get_params;
-
-    template <typename C, typename R, typename... Args>
-    struct get_params<R (C::*)(Args...) const>
-    {
-        using type = std::tuple<Args...>;
-    };
-
-    template <typename C, typename R, typename... Args>
-    struct get_params<R (C::*)(Args...)>
-    {
-        using type = std::tuple<Args...>;
-    };
-
-    // Check if parameter types match (ignoring cv-qualifiers and references)
-    template <typename... FnArgs>
-    struct params_match : std::bool_constant<sizeof...(FnArgs) == sizeof...(Ts)
-                                             && (is_same_type_v<FnArgs, Ts> && ...)>
-    {};
-
+    // Check if callable
     template <typename F, typename = void>
-    struct check_match : std::false_type
+    struct is_invocable_check : std::false_type
     {};
 
     template <typename F>
-    struct check_match<F, std::void_t<decltype(&F::operator())>>
+    struct is_invocable_check<F, std::void_t<decltype(std::declval<F>()(std::declval<Ts>()...))>>
+        : std::true_type
+    {};
+
+    // Check parameter types match exactly (ignoring cv-qualifiers and references)
+    template <typename F, typename = void>
+    struct params_match : std::false_type
+    {};
+
+    template <typename F>
+    struct params_match<F, std::void_t<decltype(&F::operator())>>
     {
-        using fn_params = typename get_params<decltype(&F::operator())>::type;
+        // Extract function signature
+        template <typename R, typename... Args>
+        static auto test(R (F::*)(Args...) const)
+            -> std::bool_constant<sizeof...(Args) == sizeof...(Ts)
+                                  && (is_same_type_v<Args, Ts> && ...)>;
 
-        template <typename... FnArgs>
-        static constexpr bool apply(std::tuple<FnArgs...>*)
-        {
-            return params_match<FnArgs...>::value;
-        }
+        template <typename R, typename... Args>
+        static auto test(R (F::*)(Args...))
+            -> std::bool_constant<sizeof...(Args) == sizeof...(Ts)
+                                  && (is_same_type_v<Args, Ts> && ...)>;
 
-        static constexpr bool value = apply(static_cast<fn_params*>(nullptr));
+        static auto test(...) -> std::false_type;
+
+        static constexpr bool value = decltype(test(&F::operator()))::value;
     };
 
 public:
-    static constexpr bool value = check_match<FnType>::value && std::is_invocable_v<Fn, Ts...>;
+    static constexpr bool value = is_invocable_check<FnType>::value && params_match<FnType>::value;
 };
 
 // Convenience alias
