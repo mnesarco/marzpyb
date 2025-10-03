@@ -68,8 +68,32 @@ target_link_libraries(test_pyarguments PRIVATE
     PyCXX
 )
 
+# Create PyCXX test executable
+add_executable(test_pycxx_arguments
+    3rdParty/PyCXX/CXX/Python3/cxxsupport.cxx
+    3rdParty/PyCXX/CXX/Python3/cxx_exceptions.cxx
+    3rdParty/PyCXX/CXX/Python3/cxx_debug_stubs.cxx
+    3rdParty/PyCXX/CXX/IndirectPythonInterface.cxx
+    tests/test_pycxx_arguments.cpp
+)
+target_include_directories(test_pycxx_arguments PRIVATE
+    ${Python_INCLUDE_DIRS}
+    ${CMAKE_CURRENT_SOURCE_DIR}/3rdParty/PyCXX/CXX/Python3
+)
+target_link_libraries(test_pycxx_arguments PRIVATE
+    ${Python_LIBRARIES}
+    gtest_main
+    gtest
+    PyCXX
+)
+
 # Add test to CTest
 add_test(NAME PyArgumentsTests
     COMMAND test_pyarguments
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+add_test(NAME PyCxxArgumentsTests
+    COMMAND test_pycxx_arguments
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )

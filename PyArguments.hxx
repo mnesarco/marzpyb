@@ -5,8 +5,6 @@
 #ifndef BASE_PYARGUMENTS_H
 #define BASE_PYARGUMENTS_H
 
-#include "CXX/Python3/Objects.hxx"
-#include "pytypedefs.h"
 #include <array>
 #include <memory>
 #include <string>
