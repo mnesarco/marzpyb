@@ -74,25 +74,25 @@ TEST_F(PyArgumentsTest, TypeListConcatenation)
 }
 
 // No arguments
-// TEST_F(PyArgumentsTest, EmptyArguments)
-// {
-//     constexpr Arguments<> args {};
+TEST_F(PyArgumentsTest, EmptyArguments)
+{
+    constexpr Arguments<> args {};
 
-//     bool called = false;
+    bool called = false;
 
-//     auto callback = [&]() { called = true; };
+    auto callback = [&]() { called = true; };
 
-//     PyObject* py_args = createTuple({});
-//     PyObject* py_kwargs = PyDict_New();
+    PyObject* py_args = createTuple({});
+    PyObject* py_kwargs = PyDict_New();
 
-//     bool result = args.match(py_args, py_kwargs, callback);
+    bool result = args.match(py_args, py_kwargs, callback);
 
-//     EXPECT_TRUE(result);
-//     EXPECT_TRUE(called);
+    EXPECT_TRUE(result);
+    EXPECT_TRUE(called);
 
-//     Py_DECREF(py_args);
-//     Py_DECREF(py_kwargs);
-// }
+    Py_DECREF(py_args);
+    Py_DECREF(py_kwargs);
+}
 
 // Test basic argument parsing with integers
 TEST_F(PyArgumentsTest, BasicIntegerArgument)

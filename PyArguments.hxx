@@ -5,12 +5,6 @@
 #ifndef BASE_PYARGUMENTS_H
 #define BASE_PYARGUMENTS_H
 
-#include "CXX/Python3/Objects.hxx"
-#include "bytesobject.h"
-#include "dictobject.h"
-#include "listobject.h"
-#include "pytypedefs.h"
-#include "unicodeobject.h"
 #include <array>
 #include <memory>
 #include <string>
@@ -56,10 +50,13 @@ struct type_list
 template <typename... Ts, typename... Us>
 inline constexpr auto concat_types(type_list<Ts...>, type_list<Us...>) -> type_list<Ts..., Us...>;
 
+template <typename... Args>
+struct expand_parse_types;
+
 // flatmap of list of parse types: The recursive case
 // Concatenate all parse types from arguments into a single list of types
 template <typename T, typename... REST>
-struct expand_parse_types
+struct expand_parse_types<T, REST...>
 {
     using head_type_list = typename T::parse_type;
     using tail_type_list = typename expand_parse_types<REST...>::parse_type;
@@ -74,10 +71,20 @@ struct expand_parse_types<T>
     using parse_type = typename T::parse_type;
 };
 
+// flatmap of list of parse types: Empty case
+template <>
+struct expand_parse_types<>
+{
+    using parse_type = type_list<>;
+};
+
+template <typename... Args>
+struct expand_value_types;
+
 // flatmap of list of value types: The recursive case
 // Concatenate all value types from arguments into a single list of types
 template <typename T, typename... REST>
-struct expand_value_types
+struct expand_value_types<T, REST...>
 {
     using head_type_list = typename T::value_type;
     using tail_type_list = typename expand_value_types<REST...>::value_type;
@@ -92,10 +99,20 @@ struct expand_value_types<T>
     using value_type = typename T::value_type;
 };
 
+// flatmap of list of value types: Empty case
+template <>
+struct expand_value_types<>
+{
+    using value_type = type_list<>;
+};
+
+template <typename... Args>
+struct expand_arg_types;
+
 // flatmap of list of named Argument types: The recursive case
 // Concatenate all named argument types into a single list of types.
 template <typename T, typename... REST>
-struct expand_arg_types
+struct expand_arg_types<T, REST...>
 {
     using head_type_list = type_list<T>;
     using tail_type_list = typename expand_arg_types<REST...>::type;
@@ -112,13 +129,23 @@ struct expand_arg_types<T>
     using type = std::conditional_t<T::named, type_list<T>, type_list<>>;
 };
 
+// flatmap of list of value types: Empty case
+template <>
+struct expand_arg_types<>
+{
+    using type = type_list<>;
+};
+
 // ┌──────────────────────────────────────────────────────────────────────────┐
 // │ Tuple utils                                                              │
 // └──────────────────────────────────────────────────────────────────────────┘
 
 // Tuple type builder from type_list
 template <typename T>
-struct type_list_to_tuple;
+struct type_list_to_tuple
+{
+    using type = std::tuple<T>;
+};
 
 // Tuple type builder from type_list
 template <typename... Ts>
@@ -193,22 +220,13 @@ template <typename Fn, typename Tuple>
 struct is_callable_with_tuple : std::false_type
 {};
 
+// Check is the lambda is callable with Exact types declared in Arguments
 template <typename Fn, typename... Ts>
 struct is_callable_with_tuple<Fn, std::tuple<Ts...>>
 {
 private:
     // Remove reference from Fn type
     using FnType = std::remove_reference_t<Fn>;
-
-    // Check if callable
-    template <typename F, typename = void>
-    struct is_invocable_check : std::false_type
-    {};
-
-    template <typename F>
-    struct is_invocable_check<F, std::void_t<decltype(std::declval<F>()(std::declval<Ts>()...))>>
-        : std::true_type
-    {};
 
     // Check parameter types match exactly (ignoring cv-qualifiers and references)
     template <typename F, typename = void>
@@ -235,7 +253,7 @@ private:
     };
 
 public:
-    static constexpr bool value = is_invocable_check<FnType>::value && params_match<FnType>::value;
+    static constexpr bool value = std::is_invocable_v<FnType, Ts...> && params_match<FnType>::value;
 };
 
 // Convenience alias
@@ -478,6 +496,8 @@ FmtString(const char (&)[N]) -> FmtString<N>;
 
 template <typename... Fmts>
 inline constexpr std::size_t fmt_size = (0 + ... + (Fmts::size - 1)) + 1;
+
+inline constexpr auto fmt_concat() { return FmtString<1>(""); }
 
 // Variadic constexpr function to concatenate FmtStrings in one pass
 template <typename... Fmts>
@@ -965,11 +985,17 @@ struct Arguments
     using args_tuple_t =
         typename detail::type_list_to_tuple<typename detail::expand_arg_types<Args...>::type>::type;
 
+    // Default constructor for empty Arguments
+    constexpr Arguments() noexcept
+        : fmt {FmtString<1>("")}
+    {}
+
     template <typename... Ts>
     explicit constexpr Arguments(Ts&&... args) noexcept
-        : keywords {detail::build_keywords(args...)}
+        : fmt {fmt_concat(args.fmt...)}
+        , keywords {detail::build_keywords(args...)}
         , args {detail::build_named_args(args...)}
-        , fmt {fmt_concat(args.fmt...)}
+
     {
         // ...
     }
