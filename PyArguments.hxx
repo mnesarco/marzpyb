@@ -6,6 +6,7 @@
 #define BASE_PYARGUMENTS_H
 
 #include <array>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -936,6 +937,17 @@ struct Arguments
         }
 
         parse_tuple_t parsed {};
+
+        // Defer parsed cleanup (exceptions safe) [RAII]
+        auto cleanup_defer = [this](parse_tuple_t* parsed) noexcept {
+            if (parsed)
+            {
+                apply_clean(*parsed, &this->args);
+            }
+        };
+        [[maybe_unused]] std::unique_ptr<parse_tuple_t, decltype(cleanup_defer)> cleanup {
+            &parsed, cleanup_defer};
+
         apply_inits(parsed, &this->args);
 
         int result = PyArg_ParseTupleAndKeywords_Tuple(args, kwArgs, fmt.value, keywords, parsed);
@@ -945,8 +957,6 @@ struct Arguments
             apply_gets(parsed, values, &this->args);
             std::apply(std::forward<Callback>(callback), std::move(values));
         }
-
-        apply_clean(parsed, &this->args);
 
         return result != 0;
     }
