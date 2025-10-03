@@ -127,12 +127,12 @@ TEST_F(PyCxxArgumentsTest, StringArgument)
 
 TEST_F(PyCxxArgumentsTest, LongArgument)
 {
-    constexpr Arguments args {arg_Long {"number"}};
+    constexpr Arguments args {arg_long {"number"}};
 
     bool called = false;
-    cxx::Long received_long;
+    long received_long;
 
-    auto callback = [&](cxx::Long number) {
+    auto callback = [&](long number) {
         called = true;
         received_long = number;
     };
@@ -144,7 +144,7 @@ TEST_F(PyCxxArgumentsTest, LongArgument)
 
     EXPECT_TRUE(result);
     EXPECT_TRUE(called);
-    EXPECT_EQ(static_cast<long>(received_long), 42);
+    EXPECT_EQ(received_long, 42);
 
     Py_DECREF(py_args);
     Py_DECREF(py_kwargs);
@@ -156,12 +156,12 @@ TEST_F(PyCxxArgumentsTest, LongArgument)
 
 TEST_F(PyCxxArgumentsTest, FloatArgument)
 {
-    constexpr Arguments args {arg_Float {"value"}};
+    constexpr Arguments args {arg_double {"value"}};
 
     bool called = false;
-    cxx::Float received_float;
+    double received_float;
 
-    auto callback = [&](cxx::Float value) {
+    auto callback = [&](double value) {
         called = true;
         received_float = value;
     };
@@ -173,7 +173,7 @@ TEST_F(PyCxxArgumentsTest, FloatArgument)
 
     EXPECT_TRUE(result);
     EXPECT_TRUE(called);
-    EXPECT_DOUBLE_EQ(static_cast<double>(received_float), 3.14);
+    EXPECT_DOUBLE_EQ(received_float, 3.14);
 
     Py_DECREF(py_args);
     Py_DECREF(py_kwargs);
@@ -353,15 +353,15 @@ TEST_F(PyCxxArgumentsTest, BytesArgument)
 TEST_F(PyCxxArgumentsTest, MultiplePyCxxArguments)
 {
     constexpr Arguments args {
-        arg_String {"name"}, arg_Long {"count"}, arg_List {"items"}, arg_Dict {"config"}};
+        arg_String {"name"}, arg_long {"count"}, arg_List {"items"}, arg_Dict {"config"}};
 
     bool called = false;
     cxx::String received_name;
-    cxx::Long received_count;
+    long received_count;
     cxx::List received_items;
     cxx::Dict received_config;
 
-    auto callback = [&](cxx::String name, cxx::Long count, cxx::List items, cxx::Dict config) {
+    auto callback = [&](cxx::String name, long count, cxx::List items, cxx::Dict config) {
         called = true;
         received_name = name;
         received_count = count;
@@ -384,7 +384,7 @@ TEST_F(PyCxxArgumentsTest, MultiplePyCxxArguments)
     EXPECT_TRUE(result);
     EXPECT_TRUE(called);
     EXPECT_EQ(std::string(received_name.as_std_string()), "test");
-    EXPECT_EQ(static_cast<long>(received_count), 5);
+    EXPECT_EQ(received_count, 5);
     EXPECT_EQ(received_items.size(), 2);
     EXPECT_EQ(received_config.size(), 1);
 
@@ -398,13 +398,13 @@ TEST_F(PyCxxArgumentsTest, MultiplePyCxxArguments)
 
 TEST_F(PyCxxArgumentsTest, PyCxxWithKeywords)
 {
-    constexpr Arguments args {arg_String {"text"}, arg_Long {"number"}};
+    constexpr Arguments args {arg_String {"text"}, arg_long {"number"}};
 
     bool called = false;
     cxx::String received_text;
-    cxx::Long received_number;
+    long received_number;
 
-    auto callback = [&](cxx::String text, cxx::Long number) {
+    auto callback = [&](cxx::String text, long number) {
         called = true;
         received_text = text;
         received_number = number;
@@ -421,7 +421,7 @@ TEST_F(PyCxxArgumentsTest, PyCxxWithKeywords)
     EXPECT_TRUE(result);
     EXPECT_TRUE(called);
     EXPECT_EQ(std::string(received_text.as_std_string()), "keyword");
-    EXPECT_EQ(static_cast<long>(received_number), 99);
+    EXPECT_EQ(received_number, 99);
 
     Py_DECREF(py_args);
     Py_DECREF(py_kwargs);
@@ -433,13 +433,13 @@ TEST_F(PyCxxArgumentsTest, PyCxxWithKeywords)
 
 TEST_F(PyCxxArgumentsTest, PyCxxWithOptionals)
 {
-    constexpr Arguments args {arg_String {"name"}, arg_optionals {}, arg_Long {"count"}};
+    constexpr Arguments args {arg_String {"name"}, arg_optionals {}, arg_long {"count"}};
 
     bool called = false;
     cxx::String received_name;
-    cxx::Long received_count;
+    long received_count;
 
-    auto callback = [&](cxx::String name, cxx::Long count) {
+    auto callback = [&](cxx::String name, long count) {
         called = true;
         received_name = name;
         received_count = count;
@@ -509,17 +509,17 @@ TEST_F(PyCxxArgumentsTest, MixedPyCxxAndNativeTypes)
 TEST_F(PyCxxArgumentsTest, DispatchOverloadsWithPyCxx)
 {
     constexpr Arguments args1 {arg_Tuple {"tuple"}};
-    constexpr Arguments args2 {arg_Long {"number"}};
+    constexpr Arguments args2 {arg_long {"number"}};
     constexpr Arguments args3 {arg_List {"items"}};
 
     bool callback1_called = false;
     bool callback2_called = false;
     bool callback3_called = false;
 
-    cxx::Long received_number;
+    long received_number = 0;
 
     auto callback1 = [&](cxx::Tuple tuple) { callback1_called = true; };
-    auto callback2 = [&](cxx::Long number) {
+    auto callback2 = [&](long number) {
         callback2_called = true;
         received_number = number;
     };
@@ -536,7 +536,7 @@ TEST_F(PyCxxArgumentsTest, DispatchOverloadsWithPyCxx)
     EXPECT_FALSE(callback1_called);
     EXPECT_TRUE(callback2_called);
     EXPECT_FALSE(callback3_called);
-    EXPECT_EQ(static_cast<long>(received_number), 777);
+    EXPECT_EQ(received_number, 777);
 
     Py_DECREF(py_args);
     Py_DECREF(py_kwargs);

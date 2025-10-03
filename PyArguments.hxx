@@ -5,6 +5,12 @@
 #ifndef BASE_PYARGUMENTS_H
 #define BASE_PYARGUMENTS_H
 
+#include "CXX/Python3/Objects.hxx"
+#include "bytesobject.h"
+#include "dictobject.h"
+#include "listobject.h"
+#include "pytypedefs.h"
+#include "unicodeobject.h"
 #include <array>
 #include <memory>
 #include <string>
@@ -174,13 +180,68 @@ inline constexpr bool has_clean_method_v = has_clean_method<T>::value;
 template <typename T>
 inline constexpr bool has_default_value_v = has_default_value<T>::value;
 
-// Helper trait to check if Fn is callable with the types in Tuple
+// Helper to remove cv-qualifiers and references for type comparison
+template <typename T>
+using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
+
+// Check if two types are the same, ignoring cv-qualifiers and references
+template <typename T1, typename T2>
+inline constexpr bool is_same_type_v = std::is_same_v<remove_cvref_t<T1>, remove_cvref_t<T2>>;
+
+// Helper trait to check if Fn is callable with the types in Tuple (no implicit conversions)
 template <typename Fn, typename Tuple>
 struct is_callable_with_tuple;
 
 template <typename Fn, typename... Ts>
-struct is_callable_with_tuple<Fn, std::tuple<Ts...>> : std::is_invocable<Fn, Ts...>
-{};
+struct is_callable_with_tuple<Fn, std::tuple<Ts...>>
+{
+private:
+    // Remove reference from Fn type
+    using FnType = std::remove_reference_t<Fn>;
+
+    // Extract parameter types from lambda/functor operator()
+    template <typename F>
+    struct get_params;
+
+    template <typename C, typename R, typename... Args>
+    struct get_params<R (C::*)(Args...) const>
+    {
+        using type = std::tuple<Args...>;
+    };
+
+    template <typename C, typename R, typename... Args>
+    struct get_params<R (C::*)(Args...)>
+    {
+        using type = std::tuple<Args...>;
+    };
+
+    // Check if parameter types match (ignoring cv-qualifiers and references)
+    template <typename... FnArgs>
+    struct params_match : std::bool_constant<sizeof...(FnArgs) == sizeof...(Ts)
+                                             && (is_same_type_v<FnArgs, Ts> && ...)>
+    {};
+
+    template <typename F, typename = void>
+    struct check_match : std::false_type
+    {};
+
+    template <typename F>
+    struct check_match<F, std::void_t<decltype(&F::operator())>>
+    {
+        using fn_params = typename get_params<decltype(&F::operator())>::type;
+
+        template <typename... FnArgs>
+        static constexpr bool apply(std::tuple<FnArgs...>*)
+        {
+            return params_match<FnArgs...>::value;
+        }
+
+        static constexpr bool value = apply(static_cast<fn_params*>(nullptr));
+    };
+
+public:
+    static constexpr bool value = check_match<FnType>::value && std::is_invocable_v<Fn, Ts...>;
+};
 
 // Convenience alias
 template <typename Fn, typename Tuple>
@@ -1081,6 +1142,31 @@ using arg_enc_cstr = ArgEncCStr<Encoding>;
 
 namespace cxx = ::Py; // PyCXX
 
+struct TupleType
+{
+    static constexpr auto parse_ptr_value() { return &PyTuple_Type; }
+};
+
+struct DictType
+{
+    static constexpr auto parse_ptr_value() { return &PyDict_Type; }
+};
+
+struct ListType
+{
+    static constexpr auto parse_ptr_value() { return &PyList_Type; }
+};
+
+struct BytesType
+{
+    static constexpr auto parse_ptr_value() { return &PyBytes_Type; }
+};
+
+struct UnicodeType
+{
+    static constexpr auto parse_ptr_value() { return &PyUnicode_Type; }
+};
+
 template <typename T>
 struct PyCxxArg : named_arg
 {
@@ -1104,55 +1190,61 @@ struct PyCxxArg : named_arg
     }
 };
 
+template <typename T, typename PyType>
+struct PyCxxExtArg : named_arg
+{
+    using value_type = detail::type_list<T>;
+    using parse_type = detail::type_list<PyType, PyObject*>;
+
+    static constexpr FmtString fmt {"O!"};
+    static constexpr std::size_t offset = 2;
+
+    template <std::size_t Offset, typename... Args>
+    static constexpr void init(std::tuple<Args...>& tuple)
+    {
+        std::get<Offset>(tuple) = PyType {};
+        std::get<Offset + 1>(tuple) = nullptr;
+    }
+
+    template <std::size_t Offset, typename... Args>
+    static auto get(std::tuple<Args...>& tuple) -> T
+    {
+        auto* ptr = static_cast<PyObject*>(std::get<Offset + 1>(tuple));
+        return T {ptr};
+    }
+};
+
 template <>
 struct Arg<cxx::Object> : PyCxxArg<cxx::Object>
 {};
 
 template <>
-struct Arg<cxx::Tuple> : PyCxxArg<cxx::Tuple>
+struct Arg<cxx::Tuple> : PyCxxExtArg<cxx::Tuple, TupleType>
 {};
 
 template <>
-struct Arg<cxx::Dict> : PyCxxArg<cxx::Dict>
+struct Arg<cxx::Dict> : PyCxxExtArg<cxx::Dict, DictType>
 {};
 
 template <>
-struct Arg<cxx::List> : PyCxxArg<cxx::List>
+struct Arg<cxx::List> : PyCxxExtArg<cxx::List, ListType>
 {};
 
 template <>
 struct Arg<cxx::Callable> : PyCxxArg<cxx::Callable>
+{
+    // Note: Callable will match any PyObject in parse phase.
+};
+
+template <>
+struct Arg<cxx::Bytes> : PyCxxExtArg<cxx::Bytes, BytesType>
 {};
 
 template <>
-struct Arg<cxx::Bytes> : PyCxxArg<cxx::Bytes>
+struct Arg<cxx::String> : PyCxxExtArg<cxx::String, UnicodeType>
 {};
 
-template <>
-struct Arg<cxx::Byte> : PyCxxArg<cxx::Byte>
-{};
-
-template <>
-struct Arg<cxx::String> : PyCxxArg<cxx::String>
-{};
-
-template <>
-struct Arg<cxx::Char> : PyCxxArg<cxx::Char>
-{};
-
-template <>
-struct Arg<cxx::Long> : PyCxxArg<cxx::Long>
-{};
-
-template <>
-struct Arg<cxx::Float> : PyCxxArg<cxx::Float>
-{};
-
-using arg_Float = Arg<cxx::Float>;
-using arg_Long = Arg<cxx::Long>;
-using arg_Char = Arg<cxx::Char>;
 using arg_String = Arg<cxx::String>;
-using arg_Byte = Arg<cxx::Byte>;
 using arg_Bytes = Arg<cxx::Bytes>;
 using arg_List = Arg<cxx::List>;
 using arg_Tuple = Arg<cxx::Tuple>;
