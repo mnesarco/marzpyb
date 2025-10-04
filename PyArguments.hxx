@@ -372,34 +372,55 @@ inline constexpr auto build_keywords(Ts&&... args)
     return result;
 }
 
-// Transform arg to tuple{arg} if named or tuple{} if not
-template <typename T>
-inline constexpr auto named_arg_filter(T&& arg)
+// Helper: Get indices of named arguments at compile time
+template <std::size_t Index, typename... Args>
+struct named_index_helper;
+
+// Base case
+template <std::size_t Index>
+struct named_index_helper<Index>
 {
-    if constexpr (std::decay_t<T>::named)
-    {
-        return std::tuple<T> {std::forward<T>(arg)};
-    }
-    else
-    {
-        return std::tuple<> {};
-    }
+    using type = std::index_sequence<>;
 };
 
-// Builder for the named arguments (strip markers and others)
-template <typename... Ts, std::size_t... Is>
-inline constexpr auto build_named_args_impl(const std::tuple<Ts...>& args,
-                                            std::index_sequence<Is...>)
+// Recursive case
+template <std::size_t Index, typename T, typename... Rest>
+struct named_index_helper<Index, T, Rest...>
 {
-    return std::tuple_cat((named_arg_filter(std::get<Is>(args)))...);
+    using tail_indices = typename named_index_helper<Index + 1, Rest...>::type;
+
+    template <std::size_t... I>
+    static constexpr auto add_if_named(std::index_sequence<I...>)
+    {
+        if constexpr (std::decay_t<T>::named)
+        {
+            return std::index_sequence<Index, I...> {};
+        }
+        else
+        {
+            return std::index_sequence<I...> {};
+        }
+    }
+
+    using type = decltype(add_if_named(tail_indices {}));
+};
+
+// Extract only named arguments by index
+template <typename... Ts, std::size_t... I>
+inline constexpr auto build_named_args_impl(const std::tuple<Ts...>& args,
+                                            std::index_sequence<I...>)
+{
+    return std::make_tuple(std::get<I>(args)...);
 }
 
 // Build a tuple of named arguments (similar to build_keywords but returns tuple of args)
 template <typename... Ts>
 inline constexpr auto build_named_args(Ts&&... args)
 {
+    using indices = typename named_index_helper<0, Ts...>::type;
+
     auto args_tuple = std::make_tuple(std::forward<Ts>(args)...);
-    return build_named_args_impl(args_tuple, std::index_sequence_for<Ts...> {});
+    return build_named_args_impl(args_tuple, indices {});
 }
 
 // Base type for markers
