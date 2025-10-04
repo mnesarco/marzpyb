@@ -212,7 +212,9 @@ template <typename Fn, typename Tuple>
 struct is_callable_with_tuple : std::false_type
 {};
 
-// Check is the lambda is callable with Exact types declared in Arguments
+// Check is the lambda is callable with Exact types declared in Arguments.
+// Lambda must match exact argument types, if implicit conversions are involved
+// then match would be unpredictable.
 template <typename Fn, typename... Ts>
 struct is_callable_with_tuple<Fn, std::tuple<Ts...>>
 {
@@ -252,6 +254,7 @@ public:
 template <typename Fn, typename Tuple>
 inline constexpr bool is_callable_with_tuple_v = is_callable_with_tuple<Fn, Tuple>::value;
 
+// Group argument traits (better cache)
 template <typename T>
 struct arg_traits
 {
@@ -260,7 +263,7 @@ struct arg_traits
     static constexpr bool has_default = has_default_value_v<T>;
 };
 
-// Call init on all parser values
+// Call init on all parser values (helper)
 template <std::size_t Index = 0, std::size_t Pos = 0, typename... Args, typename Parsed>
 inline void apply_init_helper(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
 {
@@ -281,13 +284,14 @@ inline void apply_init_helper(Parsed& parsed, const std::tuple<Args...>* args = 
     }
 }
 
+// Call init on all parser values
 template <typename... Args, typename Parsed>
 inline void apply_inits(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
 {
     apply_init_helper(parsed, args);
 }
 
-// Call clean on all parser values if available
+// Call clean on all parser values if available (helper)
 template <std::size_t Index = 0, std::size_t Pos = 0, typename... Args, typename Parsed>
 inline void apply_clean_helper(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
 {
@@ -304,6 +308,7 @@ inline void apply_clean_helper(Parsed& parsed, const std::tuple<Args...>* args =
     }
 }
 
+// Call clean on all parser values if available
 template <typename... Args, typename Parsed>
 inline void apply_clean(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
 {
@@ -311,6 +316,8 @@ inline void apply_clean(Parsed& parsed, const std::tuple<Args...>* args = nullpt
 }
 
 // Copy values from parsed to values calling its type::get
+// Almost all types involved are cheap to copy: Pointers or views
+// std::string is a special case, but std::string_view is available and also c-string
 template <std::size_t Index = 0,
           std::size_t Pos = 0,
           typename... Args,
@@ -328,6 +335,7 @@ inline void apply_get_helper(Parsed& parsed,
     }
 }
 
+// Copy values from parsed to values calling its type::get
 template <typename... Args, typename Values, typename Parsed>
 inline void apply_gets(Parsed& parsed, Values& values, const std::tuple<Args...>* args = nullptr)
 {
@@ -381,7 +389,7 @@ struct named_index_helper<Index, T, Rest...>
     using tail_indices = typename named_index_helper<Index + 1, Rest...>::type;
 
     template <std::size_t... I>
-    static constexpr auto add_if_named(std::index_sequence<I...>)
+    static constexpr auto add_if_named(std::index_sequence<I...> _seq)
     {
         if constexpr (std::decay_t<T>::named)
         {
@@ -399,7 +407,7 @@ struct named_index_helper<Index, T, Rest...>
 // Extract only named arguments by index
 template <typename... Ts, std::size_t... I>
 inline constexpr auto build_named_args_impl(const std::tuple<Ts...>& args,
-                                            std::index_sequence<I...>)
+                                            std::index_sequence<I...> _seq)
 {
     return std::make_tuple(std::get<I>(args)...);
 }
@@ -437,9 +445,9 @@ inline constexpr auto parse_ptr(T&& obj)
     }
 };
 
-// ┌──────────────────────────────────────────────────────────────────────────┐
-// │ PyArg_ParseTupleAndKeywords wrapper                                      │
-// └──────────────────────────────────────────────────────────────────────────┘
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║ PyArg_ParseTupleAndKeywords wrapper                                      ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
 
 template <typename Tuple, std::size_t... I>
 inline auto PyArg_ParseTupleAndKeywords_Impl(PyObject* args,
@@ -503,9 +511,11 @@ struct FmtString
 template <std::size_t N>
 FmtString(const char (&)[N]) -> FmtString<N>;
 
+// Total size
 template <typename... Fmts>
 inline constexpr std::size_t fmt_size = (0 + ... + (Fmts::size - 1)) + 1;
 
+// conact base case
 inline constexpr auto fmt_concat() { return FmtString<1>(""); }
 
 // Variadic constexpr function to concatenate FmtStrings in one pass
@@ -573,7 +583,7 @@ struct value_arg
 // │ Marker Arguments                                                         │
 // └──────────────────────────────────────────────────────────────────────────┘
 
-// Marker of end of positional-only arguments
+// Marker of end of positional-only arguments (Not enforced)
 struct PosOnly
 {};
 
@@ -587,14 +597,6 @@ struct Optional
 
 // Marker of Python boolean value
 struct Bool
-{};
-
-// Marker of Varargs tuple
-struct Varargs
-{};
-
-// Marker of Keywords dict
-struct Keywords
 {};
 
 // Python tuple
@@ -975,6 +977,54 @@ struct ArgEncCStr : named_arg
 // │ Arguments parser                                                         │
 // └──────────────────────────────────────────────────────────────────────────┘
 
+/**
+ * @brief Type-safe argument parser for Python C API functions.
+ *
+ * The Arguments struct provides a compile-time type-safe wrapper around
+ * PyArg_ParseTupleAndKeywords, eliminating manual format string construction
+ * and ensuring type safety between declared arguments and callback parameters.
+ *
+ * @tparam Args Variadic template parameters representing argument specifications.
+ *              Each argument should be an Arg<T> specialization that defines
+ *              the expected Python type and corresponding C++ type.
+ *
+ * @par Key Features:
+ * - **Compile-time Format String**: Automatically generates the PyArg_ParseTupleAndKeywords
+ *   format string from argument types at compile time.
+ * - **Type Safety**: Validates that callback functions accept exactly the types
+ *   specified in the Arguments declaration.
+ * - **Named Arguments**: Supports keyword arguments with automatic keyword array generation.
+ * - **Default Values**: Supports optional arguments with default values.
+ * - **RAII Cleanup**: Automatically manages memory for parsed arguments requiring cleanup.
+ * - **Zero Runtime Overhead**: All type checking and format string generation happens at compile
+ * time.
+ *
+ * @par Example Usage:
+ * @code
+ * // Define argument specification
+ * auto args_spec = Arguments{
+ *     arg_int{"width", 5},
+ *     arg_int{"height", 10},
+ *     arg_string{"title"}
+ * };
+ *
+ * // Use in Python method implementation
+ * static PyObject* myMethod(PyObject* self, PyObject* args, PyObject* kwds) {
+ *     bool success = args_spec.match(args, kwds, [](int width, int height, std::string_view title)
+ * {
+ *         // Implementation with type-safe parameters
+ *     });
+ *
+ *     if (!success) {
+ *         return nullptr;
+ *     }
+ *     Py_RETURN_NONE;
+ * }
+ * @endcode
+ *
+ * @see Arg
+ * @see dispatch_overloads
+ */
 template <typename... Args>
 struct Arguments
 {
@@ -994,11 +1044,49 @@ struct Arguments
     using args_tuple_t =
         typename detail::type_list_to_tuple<typename detail::expand_arg_types<Args...>::type>::type;
 
-    // Default constructor for empty Arguments
+    /**
+     * @brief Default constructor for empty Arguments.
+     *
+     * Creates an Arguments object with no arguments. This is useful for
+     * Python methods that take no parameters beyond self.
+     *
+     * @par Example:
+     * @code
+     * auto no_args = Arguments{};
+     * no_args.match(args, kwds, []() {
+     *     // No parameters
+     * });
+     * @endcode
+     */
     constexpr Arguments() noexcept
         : fmt {FmtString<1>("")}
     {}
 
+    /**
+     * @brief Constructs an Arguments parser from argument specifications.
+     *
+     * Accepts a variadic list of Arg<T> specializations and builds the internal
+     * structures needed for type-safe argument parsing at compile time. This includes:
+     * - Generating the PyArg_ParseTupleAndKeywords format string
+     * - Building the keyword names array for named arguments
+     * - Storing argument metadata for validation and extraction
+     *
+     * @tparam Ts Deduced types of the argument specifications (should be Arg<T> types)
+     * @param args Variadic list of argument specifications (e.g., arg_int{"name", 5})
+     *
+     * @par Example:
+     * @code
+     * auto parser = Arguments{
+     *     arg_optionals{},
+     *     arg_int{"width", 100},      // Named argument with default value
+     *     arg_int{"height", 200},     // Named argument with default value
+     *     arg_string{"title"}         // Named argument
+     * };
+     * @endcode
+     *
+     * @note This constructor is explicit to prevent accidental implicit conversions.
+     * @note All processing happens at compile time with zero runtime overhead.
+     */
     template <typename... Ts>
     explicit constexpr Arguments(Ts&&... args) noexcept
         : fmt {fmt_concat(args.fmt...)}
@@ -1009,6 +1097,63 @@ struct Arguments
         // ...
     }
 
+    /**
+     * @brief Parses Python arguments and invokes callback with type-safe parameters.
+     *
+     * Attempts to parse the Python arguments and keyword arguments according to the
+     * argument specification. If parsing succeeds, extracts the values and invokes
+     * the provided callback with the extracted values as strongly-typed parameters.
+     *
+     * The method performs the following steps:
+     * 1. Validates argument types (if Check=true, true by default)
+     * 2. Parses arguments using PyArg_ParseTupleAndKeywords
+     * 3. Extracts and converts values to their C++ types
+     * 4. Invokes the callback with the extracted values
+     * 5. Automatically cleans up temporary resources (RAII)
+     *
+     * @tparam Check Enable runtime type checking for args and kwArgs (default: true).
+     *               Set to false to skip validation if you're certain inputs are valid.
+     * @tparam Callback Deduced callable type (lambda, function pointer, functor, etc.)
+     *
+     * @param args Python tuple containing positional arguments (from PyObject* args parameter)
+     * @param kwArgs Python dict containing keyword arguments (from PyObject* kwds parameter)
+     * @param callback Callable object that accepts the parsed arguments as parameters.
+     *                 Must accept exactly the types specified in the Arguments definition.
+     *
+     * @return true if parsing succeeded and callback was invoked, false otherwise.
+     *         On failure, a Python exception is set (accessible via PyErr_Occurred).
+     *
+     * @par Example:
+     * @code
+     * auto args_spec = Arguments{
+     *     arg_int{"width"},
+     *     arg_int{"height"},
+     *     arg_string{"title"}
+     * };
+     *
+     * static PyObject* myMethod(PyObject* self, PyObject* args, PyObject* kwds) {
+     *     bool success = args_spec.match(args, kwds, [](int w, int h, std::string_view title) {
+     *         // Type-safe implementation - compiler ensures types match
+     *         std::cout << "Creating " << w << "x" << h << " window: " << title << "\n";
+     *     });
+     *
+     *     if (!success) {
+     *         return nullptr;  // Python exception already set
+     *     }
+     *     Py_RETURN_NONE;
+     * }
+     * @endcode
+     *
+     * @note The callback signature is validated at compile time. Compilation will fail
+     *       if the callback parameters don't match the argument specification.
+     * @note Memory management is automatic - temporary resources are cleaned up even
+     *       if the callback throws an exception.
+     * @note If parsing fails, a Python exception is set internally and must be handled
+     *       by the caller (typically by returning nullptr to Python).
+     *
+     * @warning The callback should not store references to string_view or pointer parameters
+     *          beyond its scope, as they may reference temporary storage.
+     */
     template <bool Check = true, typename Callback>
     auto match(PyObject* args, PyObject* kwArgs, Callback&& callback) const -> bool
     {
@@ -1061,6 +1206,9 @@ struct Arguments
 template <typename... Ts>
 Arguments(Ts&&...) -> Arguments<Ts...>;
 
+namespace detail
+{
+// Helper: dispatch to the first match
 template <typename... ArgsAndCallbacks, std::size_t... I>
 inline auto dispatch_overloads_impl(PyObject* args,
                                     PyObject* kwArgs,
@@ -1077,7 +1225,95 @@ inline auto dispatch_overloads_impl(PyObject* args,
         return arguments.match(args, kwArgs, callback);
     }());
 }
+} // namespace detail
 
+/**
+ * @brief Dispatches Python arguments to the first matching overload.
+ *
+ * Provides function overloading for Python C API methods by attempting to match
+ * the provided arguments against multiple argument specifications in order.
+ * The first specification that successfully parses the arguments will have its
+ * callback invoked. This enables type-safe function overloading similar to C++.
+ *
+ * The function accepts alternating pairs of Arguments specifications and callbacks.
+ * It attempts to match arguments in the order provided and stops at the first success.
+ * This is similar to how Python's @overload decorator or C++ function overloading works.
+ *
+ * @tparam ArgsAndCallbacks Deduced variadic template parameters representing
+ *                          alternating Arguments and callback pairs.
+ *
+ * @param args Python tuple containing positional arguments (from PyObject* args parameter)
+ * @param kwArgs Python dict containing keyword arguments (from PyObject* kwds parameter)
+ * @param args_and_callbacks Variadic list of alternating Arguments objects and callbacks.
+ *                          Must be provided in pairs: Arguments1, callback1, Arguments2, callback2,
+ * ...
+ *
+ * @return true if any overload matched and executed successfully, false if no overload matched
+ *         or if an error occurred during parsing.
+ *
+ * @par Example - Simple Overloading:
+ * @code
+ * // Define multiple overloads
+ * auto overload1 = Arguments{arg_int{"value"}};
+ * auto overload2 = Arguments{arg_string{"text"}};
+ * auto overload3 = Arguments{arg_int{"x"}, arg_int{"y"}};
+ *
+ * static PyObject* myMethod(PyObject* self, PyObject* args, PyObject* kwds) {
+ *     bool success = dispatch_overloads(
+ *         args, kwds,
+ *         // Overload 1: single integer
+ *         overload1, [](int value) {
+ *             std::cout << "Called with int: " << value << "\n";
+ *         },
+ *         // Overload 2: single string
+ *         overload2, [](std::string_view text) {
+ *             std::cout << "Called with string: " << text << "\n";
+ *         },
+ *         // Overload 3: two integers
+ *         overload3, [](int x, int y) {
+ *             std::cout << "Called with point: (" << x << ", " << y << ")\n";
+ *         }
+ *     );
+ *
+ *     if (!success) {
+ *         return nullptr;  // No overload matched or parsing failed
+ *     }
+ *     Py_RETURN_NONE;
+ * }
+ * @endcode
+ *
+ * @par Example - With Optional Arguments:
+ * @code
+ * auto no_args = Arguments{};
+ * auto with_title = Arguments{arg_string{"title"}};
+ * auto with_size = Arguments{arg_int{"width"}, arg_int{"height"}};
+ *
+ * dispatch_overloads(
+ *     args, kwds,
+ *     with_size, [](int w, int h) {
+ *         std::cout << "Size: " << w << "x" << h << "\n";
+ *     },
+ *     with_title, [](std::string_view title) {
+ *         std::cout << "Title: " << title << "\n";
+ *     },
+ *     no_args, []() {
+ *         std::cout << "No arguments\n";
+ *     }
+ * );
+ * @endcode
+ *
+ * @note Overloads are tried in the order they are provided. Place more specific
+ *       overloads before more general ones to ensure correct matching.
+ * @note Each callback must match the exact types specified in its corresponding
+ *       Arguments specification (compile-time checked).
+ * @note If no overload matches, a Python exception may be set by the last attempted
+ *       parse. Consider providing a catch-all overload if needed.
+ * @note The number of arguments must be even (pairs of Arguments and callbacks),
+ *       enforced by static_assert at compile time.
+ *
+ * @see Arguments
+ * @see Arguments::match
+ */
 template <typename... ArgsAndCallbacks>
 inline auto dispatch_overloads(PyObject* args,
                                PyObject* kwArgs,
@@ -1089,7 +1325,7 @@ inline auto dispatch_overloads(PyObject* args,
     auto tuple = std::forward_as_tuple(args_and_callbacks...);
     constexpr std::size_t num_pairs = sizeof...(args_and_callbacks) / 2;
 
-    return dispatch_overloads_impl(
+    return detail::dispatch_overloads_impl(
         args, kwArgs, std::move(tuple), std::make_index_sequence<num_pairs> {});
 }
 
