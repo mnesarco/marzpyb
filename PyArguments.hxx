@@ -6,6 +6,7 @@
 #define BASE_PYARGUMENTS_H
 
 #include <array>
+#include <bits/utility.h>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -371,30 +372,26 @@ inline constexpr auto build_keywords(Ts&&... args)
     return result;
 }
 
-// Builder for the named arguments (strip markers)
-// Recursive helper to build tuple of named args
-template <std::size_t I = 0, typename... Ts>
-inline constexpr auto build_named_args_impl(const std::tuple<Ts...>& args)
+// Transform arg to tuple{arg} if named or tuple{} if not
+template <typename T>
+inline constexpr auto named_arg_filter(T&& arg)
 {
-    if constexpr (I == sizeof...(Ts))
+    if constexpr (std::decay_t<T>::named)
     {
-        return std::tuple<> {};
+        return std::tuple<T> {std::forward<T>(arg)};
     }
     else
     {
-        using Current = std::tuple_element_t<I, std::tuple<Ts...>>;
-        auto current_arg = std::get<I>(args);
-        if constexpr (Current::named)
-        {
-            // Include this arg and recurse
-            return std::tuple_cat(std::make_tuple(current_arg), build_named_args_impl<I + 1>(args));
-        }
-        else
-        {
-            // Skip this arg and recurse
-            return build_named_args_impl<I + 1>(args);
-        }
+        return std::tuple<> {};
     }
+};
+
+// Builder for the named arguments (strip markers and others)
+template <typename... Ts, std::size_t... Is>
+inline constexpr auto build_named_args_impl(const std::tuple<Ts...>& args,
+                                            std::index_sequence<Is...>)
+{
+    return std::tuple_cat((named_arg_filter(std::get<Is>(args)))...);
 }
 
 // Build a tuple of named arguments (similar to build_keywords but returns tuple of args)
@@ -402,7 +399,7 @@ template <typename... Ts>
 inline constexpr auto build_named_args(Ts&&... args)
 {
     auto args_tuple = std::make_tuple(std::forward<Ts>(args)...);
-    return build_named_args_impl(args_tuple);
+    return build_named_args_impl(args_tuple, std::index_sequence_for<Ts...> {});
 }
 
 // Base type for markers
