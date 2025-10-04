@@ -56,11 +56,11 @@ struct expand_parse_types;
 
 // flatmap of list of parse types: The recursive case
 // Concatenate all parse types from arguments into a single list of types
-template <typename T, typename... REST>
-struct expand_parse_types<T, REST...>
+template <typename T, typename... Rest>
+struct expand_parse_types<T, Rest...>
 {
     using head_type_list = typename T::parse_type;
-    using tail_type_list = typename expand_parse_types<REST...>::parse_type;
+    using tail_type_list = typename expand_parse_types<Rest...>::parse_type;
     using parse_type
         = decltype(concat_types(std::declval<head_type_list>(), std::declval<tail_type_list>()));
 };
@@ -84,11 +84,11 @@ struct expand_value_types;
 
 // flatmap of list of value types: The recursive case
 // Concatenate all value types from arguments into a single list of types
-template <typename T, typename... REST>
-struct expand_value_types<T, REST...>
+template <typename T, typename... Rest>
+struct expand_value_types<T, Rest...>
 {
     using head_type_list = typename T::value_type;
-    using tail_type_list = typename expand_value_types<REST...>::value_type;
+    using tail_type_list = typename expand_value_types<Rest...>::value_type;
     using value_type
         = decltype(concat_types(std::declval<head_type_list>(), std::declval<tail_type_list>()));
 };
@@ -107,30 +107,21 @@ struct expand_value_types<>
     using value_type = type_list<>;
 };
 
+// Concatenate all named argument types into a single list of types.
 template <typename... Args>
 struct expand_arg_types;
 
 // flatmap of list of named Argument types: The recursive case
-// Concatenate all named argument types into a single list of types.
-template <typename T, typename... REST>
-struct expand_arg_types<T, REST...>
+template <typename T, typename... Rest>
+struct expand_arg_types<T, Rest...>
 {
-    using head_type_list = type_list<T>;
-    using tail_type_list = typename expand_arg_types<REST...>::type;
-    using type = std::conditional_t<T::named,
-                                    decltype(concat_types(std::declval<head_type_list>(),
-                                                          std::declval<tail_type_list>())),
-                                    tail_type_list>;
+    using head_type_list = std::conditional_t<T::named, type_list<T>, type_list<>>;
+    using tail_type_list = typename expand_arg_types<Rest...>::type;
+    using type
+        = decltype(concat_types(std::declval<head_type_list>(), std::declval<tail_type_list>()));
 };
 
 // flatmap of list of named Argument types: The base case for the recursion
-template <typename T>
-struct expand_arg_types<T>
-{
-    using type = std::conditional_t<T::named, type_list<T>, type_list<>>;
-};
-
-// flatmap of list of value types: Empty case
 template <>
 struct expand_arg_types<>
 {
