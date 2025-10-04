@@ -6,7 +6,6 @@
 #define BASE_PYARGUMENTS_H
 
 #include <array>
-#include <bits/utility.h>
 #include <memory>
 #include <string>
 #include <string_view>
