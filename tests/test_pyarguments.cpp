@@ -559,17 +559,16 @@ TEST_F(PyArgumentsTest, FormatStringWithOptional)
 // Test trait has_default_value
 TEST_F(PyArgumentsTest, HasDefaultValueTrait)
 {
-    static_assert(arg_traits<arg_float>::has_default, "arg_float should have default_value");
-    static_assert(arg_traits<arg_int>::has_default, "arg_int should have default_value");
-    static_assert(!arg_traits<arg_pos_only>::has_default,
-                  "arg_pos_only should not have default_value");
+    static_assert(has_default_value_v<arg_float>, "arg_float should have default_value");
+    static_assert(has_default_value_v<arg_int>, "arg_int should have default_value");
+    static_assert(!has_default_value_v<arg_pos_only>, "arg_pos_only should not have default_value");
 }
 
 // Test trait has_clean_method
 TEST_F(PyArgumentsTest, HasCleanMethodTrait)
 {
-    static_assert(arg_traits<arg_fspath>::has_clean, "arg_fspath should have clean method");
-    static_assert(!arg_traits<arg_int>::has_clean, "arg_int should not have clean method");
+    static_assert(has_clean_method_v<arg_fspath>, "arg_fspath should have clean method");
+    static_assert(!has_clean_method_v<arg_int>, "arg_int should not have clean method");
 }
 
 // Test encoding argument
@@ -709,10 +708,8 @@ TEST_F(PyArgumentsTest, FmtStringConstexpr)
 // Test type traits
 TEST_F(PyArgumentsTest, TypeTraits)
 {
-    using argument_int = arg_traits<arg_int>;
-    using raw_int = arg_traits<int>;
-    static_assert(argument_int::has_name, "arg_int should have name member");
-    static_assert(!raw_int::has_name, "int should not have name member");
+    static_assert(has_name_member_v<arg_int>, "arg_int should have name member");
+    static_assert(!has_name_member_v<int>, "int should not have name member");
 }
 
 // Test encoding names

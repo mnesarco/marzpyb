@@ -2,6 +2,13 @@
 // Copyright 2025 Frank David Martínez M. <mnesarco>
 // NOLINTBEGIN(modernize-avoid-c-arrays)
 
+// ┌──────────────────────────────────────────────────────────────────────────┐
+// │ Requires:                                                                │
+// │   - C++: std++17 or more                                                 │
+// │   - Python 3.10+                                                         │
+// │   - PyCXX 7.1+                                                           │
+// └──────────────────────────────────────────────────────────────────────────┘
+
 #ifndef BASE_PYARGUMENTS_H
 #define BASE_PYARGUMENTS_H
 
@@ -34,7 +41,7 @@ namespace Base::Py
 // ║ Private implementation details                                           ║
 // ╚══════════════════════════════════════════════════════════════════════════╝
 
-namespace detail // Private implementation details
+namespace detail
 {
 
 // ┌──────────────────────────────────────────────────────────────────────────┐
@@ -50,11 +57,11 @@ struct type_list
 template <typename... Ts, typename... Us>
 inline constexpr auto concat_types(type_list<Ts...>, type_list<Us...>) -> type_list<Ts..., Us...>;
 
+// Concatenate all parse types from arguments into a single list of types
 template <typename... Args>
 struct expand_parse_types;
 
 // flatmap of list of parse types: The recursive case
-// Concatenate all parse types from arguments into a single list of types
 template <typename T, typename... Rest>
 struct expand_parse_types<T, Rest...>
 {
@@ -78,11 +85,11 @@ struct expand_parse_types<>
     using parse_type = type_list<>;
 };
 
+// Concatenate all value types from arguments into a single list of types
 template <typename... Args>
 struct expand_value_types;
 
 // flatmap of list of value types: The recursive case
-// Concatenate all value types from arguments into a single list of types
 template <typename T, typename... Rest>
 struct expand_value_types<T, Rest...>
 {
@@ -199,6 +206,7 @@ template <typename T>
 inline constexpr bool has_default_value_v = has_default_value<T>::value;
 
 // Helper to remove cv-qualifiers and references for type comparison
+// Available in c++20 (std::remove_cvref_t) but not in c++17
 template <typename T>
 using remove_cvref_t = std::remove_cv_t<std::remove_reference_t<T>>;
 
@@ -211,9 +219,8 @@ template <typename Fn, typename Tuple>
 struct is_callable_with_tuple : std::false_type
 {};
 
-// Check is the lambda is callable with Exact types declared in Arguments.
-// Lambda must match exact argument types, if implicit conversions are involved
-// then match would be unpredictable.
+// Checks whether the lambda can be called with the exact types listed in Arguments.
+// Implicit conversions are not allowed—argument types must match exactly.
 template <typename Fn, typename... Ts>
 struct is_callable_with_tuple<Fn, std::tuple<Ts...>>
 {
@@ -253,15 +260,6 @@ public:
 template <typename Fn, typename Tuple>
 inline constexpr bool is_callable_with_tuple_v = is_callable_with_tuple<Fn, Tuple>::value;
 
-// Group argument traits (better cache)
-template <typename T>
-struct arg_traits
-{
-    static constexpr bool has_name = has_name_member_v<T>;
-    static constexpr bool has_clean = has_clean_method_v<T>;
-    static constexpr bool has_default = has_default_value_v<T>;
-};
-
 // Call init on all parser values (helper)
 template <std::size_t Index = 0, std::size_t Pos = 0, typename... Args, typename Parsed>
 inline void apply_init_helper(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
@@ -269,9 +267,8 @@ inline void apply_init_helper(Parsed& parsed, const std::tuple<Args...>* args = 
     if constexpr (Index < sizeof...(Args))
     {
         using arg_t = std::tuple_element_t<Index, std::tuple<Args...>>;
-        using traits = arg_traits<arg_t>;
 
-        if constexpr (traits::has_default)
+        if constexpr (has_default_value_v<arg_t>)
         {
             arg_t::template init<Pos>(parsed, std::get<Index>(*args).default_value);
         }
@@ -285,7 +282,7 @@ inline void apply_init_helper(Parsed& parsed, const std::tuple<Args...>* args = 
 
 // Call init on all parser values
 template <typename... Args, typename Parsed>
-inline void apply_inits(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
+inline void apply_init(Parsed& parsed, const std::tuple<Args...>* args = nullptr)
 {
     apply_init_helper(parsed, args);
 }
@@ -297,9 +294,7 @@ inline void apply_clean_helper(Parsed& parsed, const std::tuple<Args...>* args =
     if constexpr (Index < sizeof...(Args))
     {
         using arg_t = std::tuple_element_t<Index, std::tuple<Args...>>;
-        using traits = arg_traits<arg_t>;
-
-        if constexpr (traits::has_clean)
+        if constexpr (has_clean_method_v<arg_t>)
         {
             arg_t::template clean<Pos>(parsed);
         }
@@ -421,7 +416,7 @@ inline constexpr auto build_named_args(Ts&&... args)
     return build_named_args_impl(args_tuple, indices {});
 }
 
-// Base type for markers
+// Base type for markers (non named arguments with special meaning)
 struct marker_arg
 {
     using parse_type = type_list<>;
@@ -429,6 +424,7 @@ struct marker_arg
     static constexpr bool named {false};
 };
 
+// Return the appropriate pointer to pass to PyArg_ParseTupleAndKeywords
 template <typename T>
 inline constexpr auto parse_ptr(T&& obj)
 {
@@ -436,10 +432,12 @@ inline constexpr auto parse_ptr(T&& obj)
 
     if constexpr (has_parse_ptr_value_v<Type>)
     {
+        // Special cases like encodings, FSPath, Python type objects, etc..
         return Type::parse_ptr_value();
     }
     else
     {
+        // Normal case: pointer to data storage
         return &obj;
     }
 };
@@ -705,7 +703,7 @@ struct Arg<Dict> : named_arg
     }
 };
 
-// Position-only marker
+// Position-only marker (not supported by PyArg_ParseTupleAndKeywords so does nothing by now)
 template <>
 struct Arg<PosOnly> : detail::marker_arg
 {
@@ -1184,7 +1182,7 @@ struct Arguments
         [[maybe_unused]] std::unique_ptr<parse_tuple_t, decltype(cleanup_defer)> cleanup {
             &parsed, cleanup_defer};
 
-        apply_inits(parsed, &this->args);
+        apply_init(parsed, &this->args);
 
         int result = PyArg_ParseTupleAndKeywords_Tuple(args, kwArgs, fmt.value, keywords, parsed);
         if (result)
@@ -1207,6 +1205,7 @@ Arguments(Ts&&...) -> Arguments<Ts...>;
 
 namespace detail
 {
+
 // Helper: dispatch to the first match
 template <typename... ArgsAndCallbacks, std::size_t... I>
 inline auto dispatch_overloads_impl(PyObject* args,
@@ -1224,6 +1223,7 @@ inline auto dispatch_overloads_impl(PyObject* args,
         return arguments.match(args, kwArgs, callback);
     }());
 }
+
 } // namespace detail
 
 /**
