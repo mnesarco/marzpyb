@@ -8,7 +8,7 @@
 #include <string>
 #include <tuple>
 
-using namespace Base::Py;
+using namespace Base::PyArgs;
 
 // ============================================================================
 // Compile-time benchmark: exercises template instantiation without runtime

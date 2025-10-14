@@ -9,8 +9,8 @@
 #include <string>
 #include <tuple>
 
-using namespace Base::Py;
-using namespace Base::Py::detail;
+using namespace Base::PyArgs;
+using namespace Base::PyArgs::detail;
 
 class PyArgumentsTest : public ::testing::Test
 {
@@ -559,16 +559,16 @@ TEST_F(PyArgumentsTest, FormatStringWithOptional)
 // Test trait has_default_value
 TEST_F(PyArgumentsTest, HasDefaultValueTrait)
 {
-    static_assert(has_default_value_v<arg_float>, "arg_float should have default_value");
-    static_assert(has_default_value_v<arg_int>, "arg_int should have default_value");
-    static_assert(!has_default_value_v<arg_pos_only>, "arg_pos_only should not have default_value");
+    static_assert(has_default_value<arg_float>, "arg_float should have default_value");
+    static_assert(has_default_value<arg_int>, "arg_int should have default_value");
+    static_assert(!has_default_value<arg_pos_only>, "arg_pos_only should not have default_value");
 }
 
 // Test trait has_clean_method
 TEST_F(PyArgumentsTest, HasCleanMethodTrait)
 {
-    static_assert(has_clean_method_v<arg_fspath>, "arg_fspath should have clean method");
-    static_assert(!has_clean_method_v<arg_int>, "arg_int should not have clean method");
+    static_assert(has_clean_method<arg_fspath>, "arg_fspath should have clean method");
+    static_assert(!has_clean_method<arg_int>, "arg_int should not have clean method");
 }
 
 // Test encoding argument
@@ -703,13 +703,6 @@ TEST_F(PyArgumentsTest, FmtStringConstexpr)
 {
     constexpr auto result = fmt_concat(FmtString {"a"}, FmtString {"b"}, FmtString {"c"});
     EXPECT_STREQ(result.value, "abc");
-}
-
-// Test type traits
-TEST_F(PyArgumentsTest, TypeTraits)
-{
-    static_assert(has_name_member_v<arg_int>, "arg_int should have name member");
-    static_assert(!has_name_member_v<int>, "int should not have name member");
 }
 
 // Test encoding names

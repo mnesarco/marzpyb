@@ -9,7 +9,7 @@
 #include <gtest/gtest.h>
 #include <string>
 
-using namespace Base::Py;
+using namespace Base::PyArgs;
 namespace cxx = ::Py;
 
 class PyCxxArgumentsTest : public ::testing::Test

@@ -6,7 +6,7 @@
         "buildType": "Debug"
     },
     "cmake.configureSettings": {
-        "CMAKE_CXX_STANDARD": "17",
+        "CMAKE_CXX_STANDARD": "20",
         "CMAKE_CXX_STANDARD_REQUIRED": "ON",
         "CMAKE_CXX_EXTENSIONS": "OFF",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
@@ -14,7 +14,8 @@
     },
     "files.associations": {
         "*.inx": "xml",
-        "*.h": "c",
+        "*.h": "cpp",
+        "*.hxx": "cpp",
         "*.hpp": "cpp",
         "Python.h": "c",
         "algorithm": "cpp",
@@ -66,6 +67,7 @@
         "typeinfo": "cpp",
         "iostream": "cpp"
     },
+    "clangd.path": "${workspaceFolder}/.pixi/envs/default/bin/clangd",
     "clangd.arguments": [
         "--compile-commands-dir=${workspaceFolder}",
         "--background-index",
