@@ -307,8 +307,8 @@ inline constexpr auto build_keywords(Ts&&... args)
 
     size_t index = 0;
     auto add_if_valid = [&](auto&& arg) {
-        using A = std::decay_t<decltype(arg)>;
-        if constexpr (A::named)
+        using arg_t = std::decay_t<decltype(arg)>;
+        if constexpr (arg_t::named)
         {
             result[index++] = arg.name;
         }
@@ -364,7 +364,6 @@ template <typename... Ts>
 inline constexpr auto build_named_args(Ts&&... args)
 {
     using indices = typename named_index_helper<0, Ts...>::type;
-
     auto args_tuple = std::make_tuple(std::forward<Ts>(args)...);
     return build_named_args_impl(args_tuple, indices {});
 }
@@ -445,10 +444,7 @@ struct FmtString
 {
     constexpr FmtString(const char (&str)[N])
     {
-        for (std::size_t i = 0; i < N; ++i)
-        {
-            value[i] = str[i];
-        }
+        std::copy(std::begin(str), std::end(str), std::begin(value));
     }
 
     constexpr FmtString() = default;
@@ -464,9 +460,6 @@ FmtString(const char (&)[N]) -> FmtString<N>;
 // Total size
 template <typename... Fmts>
 inline constexpr std::size_t fmt_size = (0 + ... + (Fmts::size - 1)) + 1;
-
-// conact base case
-inline constexpr auto fmt_concat() { return FmtString<1>(""); }
 
 // Variadic constexpr function to concatenate FmtStrings in one pass
 template <typename... Fmts>
@@ -1038,10 +1031,10 @@ struct Arguments
      * @note All processing happens at compile time with zero runtime overhead.
      */
     template <typename... Ts>
-    explicit constexpr Arguments(Ts&&... args) noexcept
-        : fmt {fmt_concat(args.fmt...)}
-        , keywords {detail::build_keywords(args...)}
-        , args {detail::build_named_args(args...)}
+    explicit constexpr Arguments(Ts&&... arguments) noexcept
+        : fmt {fmt_concat(arguments.fmt...)}
+        , keywords {detail::build_keywords(arguments...)}
+        , args {detail::build_named_args(arguments...)}
 
     {
         // ...
@@ -1104,7 +1097,7 @@ struct Arguments
      * @warning The callback should not store references to string_view or pointer parameters
      *          beyond its scope, as they may reference temporary storage.
      */
-    template <bool Check = true, typename Callback>
+    template <bool Check = false, typename Callback>
     auto match(PyObject* args, PyObject* kwArgs, Callback&& callback) const -> bool
     {
         using namespace detail;
@@ -1132,6 +1125,7 @@ struct Arguments
                 apply_clean(*parsed, &this->args);
             }
         };
+
         [[maybe_unused]] std::unique_ptr<parse_tuple_t, decltype(cleanup_defer)> cleanup {
             &parsed, cleanup_defer};
 
