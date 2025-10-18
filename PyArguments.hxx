@@ -53,9 +53,12 @@ template <typename... Ts>
 struct type_list
 {};
 
-// Concatenate two lists of types (Deduction guide)
+// Concatenate two lists of types
 template <typename... Ts, typename... Us>
 inline constexpr auto concat_types(type_list<Ts...>, type_list<Us...>) -> type_list<Ts..., Us...>;
+
+template <typename T, typename U>
+using concat_types_t = decltype(concat_types(std::declval<T>(), std::declval<U>()));
 
 // Concatenate all parse types from arguments into a single list of types
 template <typename... Args>
@@ -67,8 +70,7 @@ struct expand_parse_types<T, Rest...>
 {
     using head_type_list = typename T::parse_type;
     using tail_type_list = typename expand_parse_types<Rest...>::parse_type;
-    using parse_type
-        = decltype(concat_types(std::declval<head_type_list>(), std::declval<tail_type_list>()));
+    using parse_type = concat_types_t<head_type_list, tail_type_list>;
 };
 
 // flatmap of list of parse types: The base case for the recursion
@@ -95,8 +97,7 @@ struct expand_value_types<T, Rest...>
 {
     using head_type_list = typename T::value_type;
     using tail_type_list = typename expand_value_types<Rest...>::value_type;
-    using value_type
-        = decltype(concat_types(std::declval<head_type_list>(), std::declval<tail_type_list>()));
+    using value_type = concat_types_t<head_type_list, tail_type_list>;
 };
 
 // flatmap of list of value types: The base case for the recursion
@@ -123,8 +124,7 @@ struct expand_arg_types<T, Rest...>
 {
     using head_type_list = std::conditional_t<T::named, type_list<T>, type_list<>>;
     using tail_type_list = typename expand_arg_types<Rest...>::type;
-    using type
-        = decltype(concat_types(std::declval<head_type_list>(), std::declval<tail_type_list>()));
+    using type = concat_types_t<head_type_list, tail_type_list>;
 };
 
 // flatmap of list of named Argument types: The base case for the recursion
