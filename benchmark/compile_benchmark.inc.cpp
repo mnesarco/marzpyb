@@ -245,8 +245,8 @@ void test_type_lists()
     using list4 = detail::type_list<>;
 
     // Type list concatenation
-    using concat1 = decltype(detail::concat_types(std::declval<list1>(), std::declval<list2>()));
-    using concat2 = decltype(detail::concat_types(std::declval<list1>(), std::declval<list4>()));
+    using concat1 = decltype(std::declval<list1>() + std::declval<list2>());
+    using concat2 = decltype(std::declval<list1>() + std::declval<list4>());
 
     // Type list to tuple conversion
     using tuple1 = typename detail::type_list_to_tuple<list1>::type;

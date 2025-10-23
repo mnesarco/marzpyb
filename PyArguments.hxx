@@ -13,11 +13,14 @@
 #define BASE_PYARGUMENTS_H
 
 #include <array>
+#include <concepts>
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 #ifndef PY_SSIZE_T_CLEAN
 #define PY_SSIZE_T_CLEAN
@@ -53,85 +56,30 @@ template <typename... Ts>
 struct type_list
 {};
 
-// Concatenate two lists of types
+// type_list concatenation operator
 template <typename... Ts, typename... Us>
-inline constexpr auto concat_types(type_list<Ts...>, type_list<Us...>) -> type_list<Ts..., Us...>;
-
-template <typename T, typename U>
-using concat_types_t = decltype(concat_types(std::declval<T>(), std::declval<U>()));
+constexpr auto operator+(type_list<Ts...>, type_list<Us...>) -> type_list<Ts..., Us...>;
 
 // Concatenate all parse types from arguments into a single list of types
 template <typename... Args>
-struct expand_parse_types;
-
-// flatmap of list of parse types: The recursive case
-template <typename T, typename... Rest>
-struct expand_parse_types<T, Rest...>
+struct expand_parse_types
 {
-    using head_type_list = typename T::parse_type;
-    using tail_type_list = typename expand_parse_types<Rest...>::parse_type;
-    using parse_type = concat_types_t<head_type_list, tail_type_list>;
-};
-
-// flatmap of list of parse types: The base case for the recursion
-template <typename T>
-struct expand_parse_types<T>
-{
-    using parse_type = typename T::parse_type;
-};
-
-// flatmap of list of parse types: Empty case
-template <>
-struct expand_parse_types<>
-{
-    using parse_type = type_list<>;
+    using parse_type = decltype((type_list<> {} + ... + std::declval<typename Args::parse_type>()));
 };
 
 // Concatenate all value types from arguments into a single list of types
 template <typename... Args>
-struct expand_value_types;
-
-// flatmap of list of value types: The recursive case
-template <typename T, typename... Rest>
-struct expand_value_types<T, Rest...>
+struct expand_value_types
 {
-    using head_type_list = typename T::value_type;
-    using tail_type_list = typename expand_value_types<Rest...>::value_type;
-    using value_type = concat_types_t<head_type_list, tail_type_list>;
-};
-
-// flatmap of list of value types: The base case for the recursion
-template <typename T>
-struct expand_value_types<T>
-{
-    using value_type = typename T::value_type;
-};
-
-// flatmap of list of value types: Empty case
-template <>
-struct expand_value_types<>
-{
-    using value_type = type_list<>;
+    using value_type = decltype((type_list<> {} + ... + std::declval<typename Args::value_type>()));
 };
 
 // Concatenate all named argument types into a single list of types.
 template <typename... Args>
-struct expand_arg_types;
-
-// flatmap of list of named Argument types: The recursive case
-template <typename T, typename... Rest>
-struct expand_arg_types<T, Rest...>
+struct expand_arg_types
 {
-    using head_type_list = std::conditional_t<T::named, type_list<T>, type_list<>>;
-    using tail_type_list = typename expand_arg_types<Rest...>::type;
-    using type = concat_types_t<head_type_list, tail_type_list>;
-};
-
-// flatmap of list of named Argument types: The base case for the recursion
-template <>
-struct expand_arg_types<>
-{
-    using type = type_list<>;
+    using type = decltype((type_list<> {} + ...
+                           + std::conditional_t<Args::named, type_list<Args>, type_list<>> {}));
 };
 
 // ┌──────────────────────────────────────────────────────────────────────────┐
@@ -140,10 +88,7 @@ struct expand_arg_types<>
 
 // Tuple type builder from type_list
 template <typename T>
-struct type_list_to_tuple
-{
-    using type = std::tuple<T>;
-};
+struct type_list_to_tuple;
 
 // Tuple type builder from type_list
 template <typename... Ts>
@@ -151,6 +96,9 @@ struct type_list_to_tuple<type_list<Ts...>>
 {
     using type = std::tuple<Ts...>;
 };
+
+template <typename T>
+using type_list_tuple = typename type_list_to_tuple<T>::type;
 
 template <typename T>
 concept has_default_value = requires(T t) { t.default_value; };
@@ -300,12 +248,12 @@ inline constexpr auto count_keywords = (0 + ... + (std::decay_t<Ts>::named ? 1 :
 
 // Build the keywords array from named arguments
 template <typename... Ts>
-inline constexpr auto build_keywords(Ts&&... args)
+inline consteval auto build_keywords(Ts&&... args)
 {
-    constexpr size_t size = count_keywords<Ts...> + 1; // +1 for nullptr
+    constexpr std::size_t size = count_keywords<Ts...> + 1; // +1 for nullptr
     std::array<const char*, size> result {};
 
-    size_t index = 0;
+    std::size_t index = 0;
     auto add_if_valid = [&](auto&& arg) {
         using arg_t = std::decay_t<decltype(arg)>;
         if constexpr (arg_t::named)
@@ -336,7 +284,7 @@ struct named_index_helper<Index, T, Rest...>
     using tail_indices = typename named_index_helper<Index + 1, Rest...>::type;
 
     template <std::size_t... I>
-    static constexpr auto add_if_named(std::index_sequence<I...> _seq)
+    static constexpr auto add_if_named(std::index_sequence<I...>)
     {
         if constexpr (std::decay_t<T>::named)
         {
@@ -353,19 +301,17 @@ struct named_index_helper<Index, T, Rest...>
 
 // Extract only named arguments by index
 template <typename... Ts, std::size_t... I>
-inline constexpr auto build_named_args_impl(const std::tuple<Ts...>& args,
-                                            std::index_sequence<I...> _seq)
+inline constexpr auto build_named_args_impl(std::tuple<Ts...>&& args, std::index_sequence<I...>)
 {
     return std::make_tuple(std::get<I>(args)...);
 }
 
 // Build a tuple of named arguments (similar to build_keywords but returns tuple of args)
 template <typename... Ts>
-inline constexpr auto build_named_args(Ts&&... args)
+inline consteval auto build_named_args(Ts&&... args)
 {
     using indices = typename named_index_helper<0, Ts...>::type;
-    auto args_tuple = std::make_tuple(std::forward<Ts>(args)...);
-    return build_named_args_impl(args_tuple, indices {});
+    return build_named_args_impl(std::make_tuple(args...), indices {});
 }
 
 // Base type for markers (non named arguments with special meaning)
@@ -404,7 +350,7 @@ inline auto PyArg_ParseTupleAndKeywords_Impl(PyObject* args,
                                              const char* fmt,
                                              char** keywords,
                                              Tuple&& tup,
-                                             std::index_sequence<I...> _seq) -> int
+                                             std::index_sequence<I...>) -> int
 {
     return PyArg_ParseTupleAndKeywords(
         args, kwArgs, fmt, keywords, parse_ptr(std::get<I>(std::forward<Tuple>(tup)))...);
@@ -975,17 +921,16 @@ struct Arguments
     using value_types = typename detail::expand_value_types<Args...>::value_type;
 
     // Type of the tuple to hold the values
-    using value_tuple_t = typename detail::type_list_to_tuple<value_types>::type;
+    using value_tuple_t = detail::type_list_tuple<value_types>;
 
     // Types to pass to Wrapped_ParseTupleAndKeywords va_list
     using parse_types = typename detail::expand_parse_types<Args...>::parse_type;
 
     // Type of the tuple to hold the values
-    using parse_tuple_t = typename detail::type_list_to_tuple<parse_types>::type;
+    using parse_tuple_t = detail::type_list_tuple<parse_types>;
 
     // Tuple of Arguments
-    using args_tuple_t =
-        typename detail::type_list_to_tuple<typename detail::expand_arg_types<Args...>::type>::type;
+    using args_tuple_t = detail::type_list_tuple<typename detail::expand_arg_types<Args...>::type>;
 
     /**
      * @brief Default constructor for empty Arguments.
@@ -1031,10 +976,10 @@ struct Arguments
      * @note All processing happens at compile time with zero runtime overhead.
      */
     template <typename... Ts>
-    explicit constexpr Arguments(Ts&&... arguments) noexcept
+    explicit consteval Arguments(Ts&&... arguments) noexcept
         : fmt {fmt_concat(arguments.fmt...)}
         , keywords {detail::build_keywords(arguments...)}
-        , args {detail::build_named_args(arguments...)}
+        , args {detail::build_named_args(std::forward<Ts>(arguments)...)}
 
     {
         // ...
@@ -1158,7 +1103,7 @@ template <typename... ArgsAndCallbacks, std::size_t... I>
 inline auto dispatch_overloads_impl(PyObject* args,
                                     PyObject* kwArgs,
                                     std::tuple<ArgsAndCallbacks...>&& args_tuple,
-                                    std::index_sequence<I...> _seq)
+                                    std::index_sequence<I...>)
 {
     return (false || ... || [&] {
         constexpr std::size_t args_idx = I * 2;

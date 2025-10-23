@@ -20,7 +20,7 @@
                 }
             ],
             "preLaunchTask": "cmake: build",
-            "miDebuggerPath": "/usr/bin/gdb",
+            "miDebuggerPath": "${workspaceFolder}/.pixi/envs/default/bin/lldb",
             "internalConsoleOptions": "openOnSessionStart"
         }
     ]

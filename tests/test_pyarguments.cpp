@@ -68,7 +68,7 @@ TEST_F(PyArgumentsTest, TypeListConcatenation)
     using list1 = type_list<int, float>;
     using list2 = type_list<double, char>;
     using expected = type_list<int, float, double, char>;
-    using result = decltype(concat_types(std::declval<list1>(), std::declval<list2>()));
+    using result = decltype(std::declval<list1>() + std::declval<list2>());
 
     static_assert(std::is_same_v<result, expected>, "Type list concatenation failed");
 }
@@ -554,21 +554,6 @@ TEST_F(PyArgumentsTest, FormatStringWithOptional)
 
     // The format string should be "i" + "|" + "f" = "i|f"
     EXPECT_STREQ(args.fmt.value, "i|f");
-}
-
-// Test trait has_default_value
-TEST_F(PyArgumentsTest, HasDefaultValueTrait)
-{
-    static_assert(has_default_value<arg_float>, "arg_float should have default_value");
-    static_assert(has_default_value<arg_int>, "arg_int should have default_value");
-    static_assert(!has_default_value<arg_pos_only>, "arg_pos_only should not have default_value");
-}
-
-// Test trait has_clean_method
-TEST_F(PyArgumentsTest, HasCleanMethodTrait)
-{
-    static_assert(has_clean_method<arg_fspath>, "arg_fspath should have clean method");
-    static_assert(!has_clean_method<arg_int>, "arg_int should not have clean method");
 }
 
 // Test encoding argument

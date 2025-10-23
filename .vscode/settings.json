@@ -69,12 +69,12 @@
     },
     "clangd.path": "${workspaceFolder}/.pixi/envs/default/bin/clangd",
     "clangd.arguments": [
-        "--compile-commands-dir=${workspaceFolder}",
+        "--compile-commands-dir=${workspaceFolder}/build",
         "--background-index",
         "--clang-tidy",
         "--header-insertion=iwyu",
         "--completion-style=detailed",
-        "--function-arg-placeholders"
+        "--function-arg-placeholders=true"
     ],
     "C_Cpp.intelliSenseEngine": "disabled",
     "C_Cpp.clang_format_path": "clang-format",

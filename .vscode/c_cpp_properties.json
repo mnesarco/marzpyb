@@ -4,22 +4,23 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
+                "${workspaceFolder}/.pixi/envs/default/lib/clang/21/include",
                 "${workspaceFolder}/.pixi/envs/default/include/python3.13",
+                "${workspaceFolder}/.pixi/envs/default/include",
                 "${workspaceFolder}/build/_deps/googletest-src/googletest/include",
                 "${workspaceFolder}/build/_deps/googletest-src/googlemock/include",
                 "/usr/include",
-                "/usr/local/include",
-                "/usr/include/clang/20/include"
+                "/usr/local/include"
             ],
             "defines": [
                 "PY_SSIZE_T_CLEAN",
                 "PY_CXX_CONST=const"
             ],
-            "compilerPath": "/usr/bin/clang++-20",
+            "compilerPath": "${workspaceFolder}/.pixi/envs/default/bin/clang",
             "cStandard": "c17",
             "cppStandard": "c++20",
             "intelliSenseMode": "linux-clang-x64",
-            "compileCommands": "${workspaceFolder}/compile_commands.json",
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
             "configurationProvider": "ms-vscode.cmake-tools"
         }
     ],
