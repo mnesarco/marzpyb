@@ -58,6 +58,22 @@ add_executable(compile_benchmark
 target_include_directories(compile_benchmark PRIVATE ${Python_INCLUDE_DIRS})
 target_link_libraries(compile_benchmark PRIVATE ${Python_LIBRARIES} PyCXX)
 
+# Compile time benchmark for PyArgParser.hxx
+add_executable(compile_benchmark2
+    benchmark2/compile_benchmark.cpp
+    benchmark2/compile_benchmark2.cpp
+    benchmark2/compile_benchmark3.cpp
+    benchmark2/compile_benchmark4.cpp
+    benchmark2/compile_benchmark5.cpp
+    benchmark2/compile_benchmark6.cpp
+    benchmark2/compile_benchmark7.cpp
+    benchmark2/compile_benchmark8.cpp
+    benchmark2/compile_benchmark9.cpp
+    benchmark2/compile_benchmark10.cpp
+)
+target_include_directories(compile_benchmark2 PRIVATE ${Python_INCLUDE_DIRS})
+target_link_libraries(compile_benchmark2 PRIVATE ${Python_LIBRARIES} PyCXX)
+
 # Create test executable
 add_executable(test_pyarguments tests/test_pyarguments.cpp)
 target_include_directories(test_pyarguments PRIVATE ${Python_INCLUDE_DIRS})
@@ -87,6 +103,17 @@ target_link_libraries(test_pycxx_arguments PRIVATE
     PyCXX
 )
 
+# Create test executable
+add_executable(test_pyargparser tests/test_pyargparser.cpp)
+target_include_directories(test_pyargparser PRIVATE ${Python_INCLUDE_DIRS})
+target_link_libraries(test_pyargparser PRIVATE
+    ${Python_LIBRARIES}
+    gtest_main
+    gtest
+    PyCXX
+)
+
+
 # Add test to CTest
 add_test(NAME PyArgumentsTests
     COMMAND test_pyarguments
@@ -95,5 +122,10 @@ add_test(NAME PyArgumentsTests
 
 add_test(NAME PyCxxArgumentsTests
     COMMAND test_pycxx_arguments
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+
+add_test(NAME PyArgParserTests
+    COMMAND test_pyargparser
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )

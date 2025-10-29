@@ -11,9 +11,9 @@ compile() {
     mkdir -p "$BUILD"
     cd "$BUILD" \
         && cmake $COMP -G Ninja -DCMAKE_BUILD_TYPE=Release .. \
-        && time ninja test_pyarguments \
-        && time ninja test_pycxx_arguments \
+        && time ninja marzpyb \
         && time ninja compile_benchmark \
+        && time ninja compile_benchmark2 \
         && cd ..
 }
 
