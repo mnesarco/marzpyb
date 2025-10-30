@@ -132,7 +132,7 @@ void test_markers()
     arg_double z {"z"};
 
     auto fmt = format<arg_int, arg_opt, arg_float, arg_kw_only, arg_double>();
-    auto kw = keywords(x, sep_opts(), y, sep_kw_only(), z);
+    auto kw = keywords(x, mk::opt, y, mk::kw_only, z);
     (void)fmt;
     (void)kw;
 }
@@ -144,7 +144,7 @@ void test_optional_with_defaults()
     arg_float y {"y", 1.0f};
 
     auto fmt = format<arg_int, arg_opt, arg_float>();
-    auto kw = keywords(x, sep_opts(), y);
+    auto kw = keywords(x, mk::opt, y);
     (void)fmt;
     (void)kw;
 }
@@ -160,7 +160,7 @@ void test_complex_combinations()
 
     auto fmt
         = format<arg_int, arg_opt, arg_float, arg_PyObjectAny, arg_utf8_buffer, arg_enc_cstr>();
-    auto kw = keywords(x, sep_opts(), y, target, name, enc);
+    auto kw = keywords(x, mk::opt, y, target, name, enc);
     (void)fmt;
     (void)kw;
 }
@@ -376,7 +376,7 @@ void run_parse()
         arg_float y {"y", 5.0f};
         PyObject* args = bm_create_tuple({PyLong_FromLong(100)});
         PyObject* kwargs = PyDict_New();
-        (void)parse(args, kwargs, x, sep_opts(), y);
+        (void)parse(args, kwargs, x, mk::opt, y);
         Py_DECREF(args);
         Py_DECREF(kwargs);
     }

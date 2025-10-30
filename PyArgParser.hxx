@@ -38,46 +38,47 @@
 namespace pyargs
 {
 
+/// Argument attributes
 enum Flags : uint8_t
 {
-    Flag_None = 0,
-    Flag_PosOnly = 1u << 0,
-    Flag_Marker = 1u << 1
+    Flag_None = 0,          ///< Normal argument (positional or keyword)
+    Flag_PosOnly = 1u << 0, ///< Position-Only argument
+    Flag_Marker = 1u << 1   ///< Control argument like | $ : ;
 };
 
+///< Control argument like | $ : ;
 struct arg_marker
 {
-    template <std::size_t N>
-    void init_slots(std::size_t&, std::array<void*, N>&)
-    {}
+    void init_slots(std::size_t&, void**)
+    {
+        // Noop, but keeping the method simplifies generics
+    }
 
     static constexpr uint8_t slots = 0;
     static constexpr Flags flags = Flag_Marker;
     static constexpr std::string_view keyword = "";
 };
 
+/// Start of optional arguments
 struct arg_opt : arg_marker
 {
     static constexpr std::string_view fmt = "|";
 };
 
+/// Start of keyword-only arguments
 struct arg_kw_only : arg_marker
 {
     static constexpr std::string_view fmt = "$";
 };
 
-inline arg_opt& sep_opts()
+/// Markers
+struct mk
 {
-    static arg_opt value {};
-    return value;
-}
+    inline static arg_opt opt {};
+    inline static arg_kw_only kw_only {};
+};
 
-inline arg_kw_only& sep_kw_only()
-{
-    static arg_kw_only value {};
-    return value;
-}
-
+/// Base Argument
 template <typename T>
 struct BaseArg
 {
@@ -91,19 +92,18 @@ struct BaseArg
     constexpr BaseArg(BaseArg&&) = default;
     constexpr BaseArg& operator=(const BaseArg&) = default;
     constexpr BaseArg& operator=(BaseArg&&) = default;
-    constexpr ~BaseArg() = default;
 
     constexpr explicit(false) BaseArg(T&& val)
         : value {std::forward<T>(val)}
     {}
 
+    constexpr explicit(false) BaseArg(T& val)
+        : value {val}
+    {}
+
     constexpr BaseArg(std::string_view keyword, T&& val)
         : value {std::forward<T>(val)}
         , keyword {keyword}
-    {}
-
-    constexpr explicit(false) BaseArg(T& val)
-        : value {val}
     {}
 
     constexpr BaseArg(std::string_view keyword, T& val)
@@ -116,36 +116,38 @@ struct BaseArg
         , keyword {keyword}
     {}
 
-    template <std::size_t N>
-    void init_slots(std::size_t& pos, std::array<void*, N>& args)
-    {
-        args[pos++] = &value;
-    }
+    constexpr explicit(false) operator T&() { return value; }
+    constexpr explicit(false) operator const T&() const { return value; }
+
+    void init_slots(std::size_t& pos, void** args) { args[pos++] = &value; }
 
     static constexpr uint8_t slots = 1;
     static constexpr Flags flags = Flag_None;
-    static constexpr std::string_view fmt = "";
+
+protected:
+    // Prevent dynamic polymorphism
+    constexpr ~BaseArg() = default;
 };
 
+/// Basic buffer, receives data and length
 struct BufferArg : BaseArg<const char*>
 {
     Py_ssize_t size {};
 
-    BufferArg(std::string_view keyword)
+    constexpr BufferArg(std::string_view keyword)
         : BaseArg(keyword, "")
     {}
 
-    operator bool() const { return value != nullptr; }
+    constexpr operator bool() const { return value != nullptr; }
 
-    operator std::string_view() const
+    operator const std::string_view() const
     {
         if (value)
             return std::string_view {value, static_cast<std::size_t>(size)};
         return {};
     }
 
-    template <std::size_t N>
-    void init_slots(std::size_t& pos, std::array<void*, N>& args)
+    void init_slots(std::size_t& pos, void** args)
     {
         args[pos++] = &value;
         args[pos++] = &size;
@@ -154,23 +156,23 @@ struct BufferArg : BaseArg<const char*>
     static constexpr uint8_t slots = 2;
 };
 
+/// Encoded string, receive data and uses specified encoding
 struct EncodedStringArg : BaseArg<char*>
 {
     const char* encoding = "utf-8";
 
-    EncodedStringArg(const char* keyword, const char* encoding)
+    constexpr EncodedStringArg(const char* keyword, const char* encoding)
         : BaseArg(keyword)
         , encoding {encoding}
     {}
 
-    EncodedStringArg(const char* keyword)
+    constexpr EncodedStringArg(const char* keyword)
         : BaseArg(keyword)
     {}
 
-    operator const char*() const { return value; }
+    constexpr operator const char*() const { return value; }
 
-    template <std::size_t N>
-    void init_slots(std::size_t& pos, std::array<void*, N>& args)
+    void init_slots(std::size_t& pos, void** args)
     {
         args[pos++] = const_cast<char*>(encoding);
         args[pos++] = &value;
@@ -179,27 +181,27 @@ struct EncodedStringArg : BaseArg<char*>
     static constexpr uint8_t slots = 2;
 };
 
+/// Encoded buffer, receives data and length and uses specified encoding
 struct EncodedBufferArg : BaseArg<char*>
 {
     const char* encoding = "utf-8";
     Py_ssize_t size {};
 
-    EncodedBufferArg(const char* keyword, const char* encoding)
+    constexpr EncodedBufferArg(const char* keyword, const char* encoding)
         : BaseArg(keyword)
         , encoding {encoding}
     {}
 
-    EncodedBufferArg(const char* keyword)
+    constexpr EncodedBufferArg(const char* keyword)
         : BaseArg(keyword)
     {}
 
-    operator std::string_view() const
+    constexpr operator const std::string_view() const
     {
         return std::string_view {value, static_cast<std::size_t>(size)};
     }
 
-    template <std::size_t N>
-    void init_slots(std::size_t& pos, std::array<void*, N>& args)
+    void init_slots(std::size_t& pos, void** args)
     {
         args[pos++] = const_cast<char*>(encoding);
         args[pos++] = &value;
@@ -213,97 +215,103 @@ struct EncodedBufferArg : BaseArg<char*>
 // │ Arguments: Numbers                                                       │
 // └──────────────────────────────────────────────────────────────────────────┘
 
-struct arg_byte : BaseArg<unsigned char>
+struct arg_bool final : BaseArg<int>
+{
+    using BaseArg::BaseArg;
+    static constexpr std::string_view fmt = "p";
+};
+
+struct arg_byte final : BaseArg<unsigned char>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "b";
 };
 
-struct arg_byte_noc : BaseArg<unsigned char>
+struct arg_byte_noc final : BaseArg<unsigned char>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "B";
 };
 
-struct arg_short : BaseArg<short>
+struct arg_short final : BaseArg<short>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "h";
 };
 
-struct arg_ushort : BaseArg<unsigned short>
+struct arg_ushort final : BaseArg<unsigned short>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "H";
 };
 
-struct arg_int : BaseArg<int>
+struct arg_int final : BaseArg<int>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "i";
 };
 
-struct arg_uint : BaseArg<unsigned int>
+struct arg_uint final : BaseArg<unsigned int>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "I";
 };
 
-struct arg_long : BaseArg<long>
+struct arg_long final : BaseArg<long>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "l";
 };
 
-struct arg_ulong : BaseArg<unsigned long>
+struct arg_ulong final : BaseArg<unsigned long>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "k";
 };
 
-struct arg_long_long : BaseArg<long long>
+struct arg_long_long final : BaseArg<long long>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "L";
 };
 
-struct arg_ulong_long : BaseArg<unsigned long long>
+struct arg_ulong_long final : BaseArg<unsigned long long>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "K";
 };
 
-struct arg_py_size : BaseArg<Py_ssize_t>
+struct arg_py_size final : BaseArg<Py_ssize_t>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "n";
 };
 
-struct arg_char : BaseArg<char>
+struct arg_char final : BaseArg<char>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "c";
 };
 
-struct arg_utf8_char : BaseArg<int>
+struct arg_utf8_char final : BaseArg<int>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "C";
 };
 
-struct arg_float : BaseArg<float>
+struct arg_float final : BaseArg<float>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "f";
 };
 
-struct arg_double : BaseArg<double>
+struct arg_double final : BaseArg<double>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "d";
 };
 
-struct arg_complex : BaseArg<Py_complex>
+struct arg_complex final : BaseArg<Py_complex>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "D";
@@ -313,103 +321,103 @@ struct arg_complex : BaseArg<Py_complex>
 // │ Arguments: Strings and Buffers                                           │
 // └──────────────────────────────────────────────────────────────────────────┘
 
-struct arg_utf8_cstr : BaseArg<const char*>
+struct arg_utf8_cstr final : BaseArg<const char*>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "s";
 };
 
-struct arg_utf8_cstr_none : BaseArg<const char*>
+struct arg_utf8_cstr_none final : BaseArg<const char*>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "z";
 };
 
-struct arg_utf8_buffer : BufferArg
+struct arg_utf8_buffer final : BufferArg
 {
     using BufferArg::BufferArg;
     static constexpr std::string_view fmt = "s#";
 };
 
-struct arg_bytes_buffer_none : BufferArg
+struct arg_bytes_buffer_none final : BufferArg
 {
     using BufferArg::BufferArg;
     static constexpr std::string_view fmt = "z#";
 };
 
-struct arg_utf8_pybuffer : BaseArg<Py_buffer>
+struct arg_utf8_pybuffer final : BaseArg<Py_buffer>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "s*";
 };
 
-struct arg_utf8_pybuffer_none : BaseArg<Py_buffer>
+struct arg_utf8_pybuffer_none final : BaseArg<Py_buffer>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "z*";
 };
 
-struct arg_enc_cstr : EncodedStringArg
+struct arg_enc_cstr final : EncodedStringArg
 {
     using EncodedStringArg::EncodedStringArg;
     static constexpr std::string_view fmt = "es";
 };
 
-struct arg_enc_thru_cstr : EncodedStringArg
+struct arg_enc_thru_cstr final : EncodedStringArg
 {
     using EncodedStringArg::EncodedStringArg;
     static constexpr std::string_view fmt = "et";
 };
 
-struct arg_enc_buffer : EncodedBufferArg
+struct arg_enc_buffer final : EncodedBufferArg
 {
     using EncodedBufferArg::EncodedBufferArg;
     static constexpr std::string_view fmt = "es#";
 };
 
-struct arg_enc_thru_buffer : EncodedBufferArg
+struct arg_enc_thru_buffer final : EncodedBufferArg
 {
     using EncodedBufferArg::EncodedBufferArg;
     static constexpr std::string_view fmt = "et#";
 };
 
-struct arg_cbytes : BaseArg<const char*>
+struct arg_cbytes final : BaseArg<const char*>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "y";
 };
 
-struct arg_bytes_pybuffer : BaseArg<Py_buffer>
+struct arg_bytes_pybuffer final : BaseArg<Py_buffer>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "y*";
 };
 
-struct arg_bytes : BufferArg
+struct arg_bytes final : BufferArg
 {
     using BufferArg::BufferArg;
     static constexpr std::string_view fmt = "y#";
 };
 
-struct arg_pybytes : BaseArg<PyBytesObject*>
+struct arg_pybytes final : BaseArg<PyBytesObject*>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "S";
 };
 
-struct arg_pybyte_array : BaseArg<PyByteArrayObject*>
+struct arg_pybyte_array final : BaseArg<PyByteArrayObject*>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "Y";
 };
 
-struct arg_pyunicode : BaseArg<PyObject*>
+struct arg_pyunicode final : BaseArg<PyObject*>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "U";
 };
 
-struct arg_pybuffer : BaseArg<Py_buffer>
+struct arg_pybuffer final : BaseArg<Py_buffer>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "w*";
@@ -419,23 +427,22 @@ struct arg_pybuffer : BaseArg<Py_buffer>
 // │ Arguments: Objects                                                       │
 // └──────────────────────────────────────────────────────────────────────────┘
 
-struct arg_PyObjectAny : BaseArg<PyObject*>
+struct arg_PyObjectAny final : BaseArg<PyObject*>
 {
     using BaseArg::BaseArg;
     static constexpr std::string_view fmt = "O";
 };
 
-struct arg_PyObject : BaseArg<PyObject*>
+struct arg_PyObject final : BaseArg<PyObject*>
 {
     PyTypeObject* objectType {};
 
-    arg_PyObject(std::string_view keyword, PyTypeObject* type, PyObject* value = nullptr)
+    constexpr arg_PyObject(std::string_view keyword, PyTypeObject* type, PyObject* value = nullptr)
         : BaseArg(keyword, value)
         , objectType {type}
     {}
 
-    template <std::size_t N>
-    void init_slots(std::size_t& pos, std::array<void*, N>& args)
+    void init_slots(std::size_t& pos, void** args)
     {
         args[pos++] = objectType;
         args[pos++] = &value;
@@ -452,7 +459,7 @@ struct Kw
 };
 
 template <typename... Ts>
-inline auto keywords(const Ts&... args)
+inline constexpr auto keywords(const Ts&... args)
 {
     std::array<const char*, sizeof...(Ts) + 1> kws {};
     std::array args_kw {
@@ -503,7 +510,8 @@ inline bool parse(PyObject* args, PyObject* kwargs, Ts&... arg)
     constexpr std::size_t N = (0 + ... + std::decay_t<Ts>::slots);
     std::array<void*, N> slots {};
     std::size_t pos = 0;
-    (arg.init_slots(pos, slots), ...);
+    void** slotsPtr = slots.data();
+    (arg.init_slots(pos, slotsPtr), ...);
 
     auto fmt = format<Ts...>();
     auto kws = keywords(arg...);

@@ -97,12 +97,12 @@ TEST_F(PyArgParserTest, OptIntArgument)
     PyObject* py_args = createTuple({PyLong_FromLong(42)});
     PyObject* py_kwargs = PyDict_New();
 
-    bool result0 = parse(py_args0, py_kwargs, sep_opts(), x);
+    bool result0 = parse(py_args0, py_kwargs, mk::opt, x);
 
     EXPECT_TRUE(result0);
     EXPECT_EQ(x.value, 5);
 
-    bool result = parse(py_args, py_kwargs, sep_opts(), x);
+    bool result = parse(py_args, py_kwargs, mk::opt, x);
 
     EXPECT_TRUE(result);
     EXPECT_EQ(x.value, 42);
@@ -127,12 +127,12 @@ TEST_F(PyArgParserTest, OptIntKwArgument)
         {"y", PyLong_FromLong(37)}
     });
 
-    bool result0 = parse(py_args0, py_kwargs0, sep_opts(), x);
+    bool result0 = parse(py_args0, py_kwargs0, mk::opt, x);
 
     EXPECT_TRUE(result0);
     EXPECT_EQ(x.value, 5);
 
-    bool result = parse(py_args, py_kwargs0, sep_opts(), x);
+    bool result = parse(py_args, py_kwargs0, mk::opt, x);
 
     EXPECT_TRUE(result);
     EXPECT_EQ(x.value, 42);
@@ -300,7 +300,7 @@ TEST_F(PyArgParserTest, OptionalArgumentsWithDefaults)
     PyObject* py_args = createTuple({PyLong_FromLong(100)});
     PyObject* py_kwargs = PyDict_New();
 
-    bool result = parse(py_args, py_kwargs, x, sep_opts(), y);
+    bool result = parse(py_args, py_kwargs, x, mk::opt, y);
 
     EXPECT_TRUE(result);
     EXPECT_EQ(x.value, 100);
@@ -581,7 +581,7 @@ TEST_F(PyArgParserTest, KeywordOnlyArguments)
         {"y", PyLong_FromLong(20)}
     });
 
-    bool result = parse(py_args, py_kwargs, x, sep_kw_only(), y);
+    bool result = parse(py_args, py_kwargs, x, mk::kw_only, y);
 
     EXPECT_TRUE(result);
     EXPECT_EQ(x.value, 10);
@@ -613,7 +613,7 @@ TEST_F(PyArgParserTest, ComplexArgumentCombination)
     });
     PyObject* py_kwargs = PyDict_New();
 
-    bool result = parse(py_args, py_kwargs, x, sep_opts(), y, target, flag, name, ux, path);
+    bool result = parse(py_args, py_kwargs, x, mk::opt, y, target, flag, name, ux, path);
 
     EXPECT_TRUE(result);
     EXPECT_EQ(x.value, 10);
